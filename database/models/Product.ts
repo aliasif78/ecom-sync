@@ -22,20 +22,24 @@ import { Schema, models, model, Model, Document } from 'mongoose';
 // 💿 CONSTANTS
 // ==========================================
 const SYNCING = 'SYNCING';
-const SYNC_STATES = ['IDLE', SYNCING, 'FAILED'];
+const IDLE = 'IDLE';
+const FAILED = 'FAILED';
+const SYNC_STATES = [IDLE, SYNCING, FAILED];
 const SHOPIFY = 'shopify';
 const AMAZON = 'amazon';
 const WOOCOMMERCE = 'woocommerce';
 
+export const SYNC_STATUS = { IDLE, SYNCING, FAILED } as const;
+
 // ==========================================
 // 🚓 INTERFACES
 // ==========================================
-interface IInventoryLevel {
+export interface IInventoryLevel {
   locationId: string;
   quantity: number;
 }
 
-interface IProduct extends Document {
+export interface IProduct extends Document {
   sku: string;
   name: string;
   price: number;
@@ -85,7 +89,7 @@ const ProductSchema = new Schema<IProduct>(
       amazon: {
         asin: { type: String, sparse: true }, // Amazon Standard Identification Number
         fulfillmentSku: { type: String }, // Amazon Fullfillment SKU
-        syncStatus: { type: String, enum: SYNC_STATES, default: 'IDLE' }, // async repsonse
+        syncStatus: { type: String, enum: SYNC_STATES, default: IDLE }, // async repsonse
         lastSyncError: { type: String },
       },
 
@@ -169,8 +173,10 @@ ProductSchema.statics.findByPlatformId = async function (platform: typeof SHOPIF
 // 🏎️ INDEXES - Speed up queries
 // ==========================================
 
-ProductSchema.index({ 'mappings.shopify.variantId': 1 });
-ProductSchema.index({ 'mappings.amazon.asin': 1 });
+// Done inside the model definition using the 'index' or 'sparse' options
+
+// ProductSchema.index({ 'mappings.shopify.variantId': 1 });
+// ProductSchema.index({ 'mappings.amazon.asin': 1 });
 
 const Product = (models.Product as IProductModel) || model<IProduct, IProductModel>('Product', ProductSchema);
 export default Product;
