@@ -61,7 +61,7 @@ async function seed() {
     console.log('✅ Seed Complete!');
     process.exit(0);
   } catch (error) {
-    console.error('❌ Seed Failed:', error);
+    console.error('⛔️ Seed Failed:', error);
     process.exit(1);
   }
 }

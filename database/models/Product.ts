@@ -60,6 +60,10 @@ export interface IProduct extends Document {
 
   // Virtuals
   readonly isSyncing: boolean;
+
+  // Timestamps
+  createdAt: Date;
+  updatedAt: Date;
 }
 
 interface IProductModel extends Model<IProduct> {
