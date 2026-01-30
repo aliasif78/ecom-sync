@@ -1,9 +1,13 @@
 'use client';
 
+// Next JS
+import Image from 'next/image';
+
+// Contexts
+import { useSyncModal } from '@/contexts/SyncModalProvider';
+
 // Interfaces
 // Define the shape of the data strictly for the Frontend
-
-import Image from 'next/image';
 
 // We do NOT import IProduct because that is for the backend only.
 export interface ProductRow {
@@ -23,7 +27,7 @@ interface Props {
 }
 
 // ==========================================
-// Helper Functions (Clean Code Pattern)
+// Helper Functions
 // ==========================================
 const formatCurrency = (amount: number) => new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(amount);
 
@@ -37,6 +41,9 @@ const getStockStatus = (stock: number) => {
 // Component
 // ==========================================
 const ProductTable = ({ products }: Props) => {
+  // Contexts
+  const { openModal } = useSyncModal();
+
   return (
     <div className="w-full overflow-hidden rounded-2xl border border-white/10 bg-slate-900 shadow-2xl backdrop-blur-xl">
       {/* Header */}
@@ -73,6 +80,7 @@ const ProductTable = ({ products }: Props) => {
                       <div className="relative h-14 w-14 shrink-0 overflow-hidden rounded-xl border border-white/10 bg-slate-800">
                         <Image src={product.image} alt={product.name} fill className="object-cover" sizes="56px" />
                       </div>
+
                       <div>
                         <div className="text-base font-semibold text-slate-100">{product.name}</div>
                         <div className="mt-1 font-mono text-xs text-slate-500">{product.sku}</div>
@@ -98,7 +106,9 @@ const ProductTable = ({ products }: Props) => {
 
                   {/* Column 5: Actions */}
                   <td className="px-8 py-5 text-right text-sm font-medium whitespace-nowrap">
-                    <button className="rounded-lg bg-indigo-600 px-5 py-2.5 font-semibold text-white shadow-lg transition-all hover:bg-indigo-500">Sync Now</button>
+                    <button onClick={() => openModal(product)} className="rounded-lg bg-indigo-600 px-5 py-2.5 font-semibold text-white shadow-lg transition-all hover:bg-indigo-500">
+                      Sync Now
+                    </button>
                   </td>
                 </tr>
               );

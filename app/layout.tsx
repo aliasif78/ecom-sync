@@ -2,6 +2,9 @@
 import type { Metadata } from 'next';
 import { Geist, Geist_Mono } from 'next/font/google';
 
+// Shadcn
+import { Toaster } from 'sonner';
+
 // Styles
 import './globals.css';
 
@@ -15,7 +18,10 @@ export const metadata: Metadata = { title: 'EcomSync | Inventory Master', descri
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   return (
     <html lang="en">
-      <body className={`${geistSans.variable} ${geistMono.variable} min-h-screen bg-slate-50 font-sans text-slate-900 antialiased`}>{children}</body>
+      <body className={`${geistSans.variable} ${geistMono.variable} min-h-screen bg-slate-50 font-sans text-slate-900 antialiased`}>
+        <main>{children}</main>
+        <Toaster />
+      </body>
     </html>
   );
 }
