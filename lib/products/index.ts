@@ -3,6 +3,8 @@ import Product from '@/database/models/Product';
 import { connectDB } from '@/database/mongoose';
 
 // GET Products
+// This exists here, only because the component using it is a server component
+// If it were a client component, we would use server actions
 export async function getProducts() {
   try {
     // 1. Connect to the DB

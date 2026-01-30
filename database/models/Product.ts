@@ -14,9 +14,14 @@
 // 3. Shopify allows roughly 2 requests per second. Amazon varies.
 
 // ==========================================
-// 📦 DEPENDENCIES
+// 📦 Imports
 // ==========================================
+
+// Dependencies
 import { Schema, models, model, Model, Document } from 'mongoose';
+
+// Constants
+import { SHOPIFY, WOOCOMMERCE, AMAZON } from '@/lib/globalConstants';
 
 // ==========================================
 // 💿 CONSTANTS
@@ -25,9 +30,6 @@ const SYNCING = 'SYNCING';
 const IDLE = 'IDLE';
 const FAILED = 'FAILED';
 const SYNC_STATES = [IDLE, SYNCING, FAILED];
-const SHOPIFY = 'shopify';
-const AMAZON = 'amazon';
-const WOOCOMMERCE = 'woocommerce';
 
 export const SYNC_STATUS = { IDLE, SYNCING, FAILED } as const;
 
