@@ -5,6 +5,7 @@ import { useState } from 'react';
 
 // Next Js
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 
 // Shadcn
 import { toast } from 'sonner';
@@ -12,7 +13,16 @@ import { toast } from 'sonner';
 // Icons
 import { PiArrowLeft } from 'react-icons/pi';
 
+// Actions
+import { login, signUp } from '@/actions/auth';
+
+// Utils
+import { getErrorMessage } from '@/lib/utils';
+
 export default function LoginPage() {
+  // Hooks
+  const router = useRouter();
+
   // =========
   // States
   // =========
@@ -37,36 +47,65 @@ export default function LoginPage() {
   // =========
   // Functions
   // =========
+  const handleError = (msg: string) => {
+    toast.error(getErrorMessage(msg));
+    setIsLoading(false);
+  };
+
+  const handleResult = (res: { success: boolean; error: unknown }, successMsg: string, redirectPath: string) => {
+    if (!res.success || res.error) {
+      handleError(res.error as string);
+      return;
+    }
+
+    // 4. Success
+    toast.success(successMsg);
+    router.push(redirectPath);
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
 
     try {
-      // LOGIN LOGIC
+      // =========
+      // LOGIN
+      // =========
       if (isLogin) {
-        console.log('Logging in:', email);
-        // await login(email, password);
-        toast.info('Login logic coming soon...');
-      }
-
-      // SIGNUP LOGIC
-      else {
         // 1. Validation
-        if (password !== confirmPassword) {
-          toast.error("Passwords don't match");
-          setIsLoading(false);
+        if (!email || !password) {
+          handleError('Email and password are required');
           return;
         }
 
-        // 2. Prepare Data
-        const userData = { email, password, fullName, stores: { shopify: shopifyStore, amazon: amazonStore, woocommerce: wooStore } };
-        console.log('Signing up with:', userData);
-        toast.info('Signup logic coming soon...');
+        // 2. Call the server action
+        const res = await login({ email, password });
+        handleResult({ success: res.success, error: res.error }, 'Login successful', '/products');
+      }
+
+      // =========
+      // SIGNUP
+      // =========
+      else {
+        // 1. Validation
+        if (!email || !password || !fullName || !confirmPassword) {
+          handleError('All fields are required');
+          return;
+        }
+
+        if (password !== confirmPassword) {
+          handleError("Passwords don't match");
+          return;
+        }
+
+        // 2. Signup
+        const stores = { shopify: shopifyStore, amazon: amazonStore, woocommerce: wooStore };
+        const res = await signUp({ email, password, confirmPassword, name: fullName, stores });
+        handleResult({ success: res.success, error: res.error }, 'Account created successfully', '/products');
       }
     } catch (error) {
       toast.error('Authentication failed');
       console.error(error);
-    } finally {
       setIsLoading(false);
     }
   };
