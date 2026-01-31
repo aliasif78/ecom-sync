@@ -5,6 +5,9 @@ import { Geist, Geist_Mono } from 'next/font/google';
 // Shadcn
 import { Toaster } from 'sonner';
 
+// Supabase
+import { createClient } from '@/lib/supabase/server';
+
 // Components
 import Navbar from '@/components/Navbar';
 
@@ -18,12 +21,17 @@ const geistMono = Geist_Mono({ variable: '--font-geist-mono', subsets: ['latin']
 // Metadata
 export const metadata: Metadata = { title: 'EcomSync | Inventory Master', description: 'Real-time inventory synchronization across Shopify, Amazon, and WooCommerce.', icons: { icon: '/favicon.ico' } };
 
-export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
+export default async function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
+  // 1. Fetch User on the Server (Instant, no loading state)
+  const supabase = await createClient();
+  const { data } = await supabase.auth.getUser();
+  const { user } = data;
+
   return (
     <html lang="en">
-      <body className={`${geistSans.variable} ${geistMono.variable} min-h-screen bg-slate-50 font-sans text-slate-900 antialiased`} suppressHydrationWarning>
+      <body className={`${geistSans.variable} ${geistMono.variable} min-h-screen bg-zinc-950 font-sans text-slate-900 antialiased`} suppressHydrationWarning>
         {/* ✅ The Navbar sits here. It decides internally whether to show up. */}
-        <Navbar />
+        <Navbar user={user} />
 
         <main className="min-h-screen bg-gray-50">{children}</main>
         <Toaster richColors position="top-center" />
