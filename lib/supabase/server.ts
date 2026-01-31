@@ -7,6 +7,7 @@ import { createServerClient } from '@supabase/ssr';
 // Utils
 import { getEnvVariables } from './utils';
 
+// Will be used by server components
 export const createClient = async () => {
   // Get cookie store
   const cookieStore = await cookies();
