@@ -108,7 +108,6 @@ const ProductSchema = new Schema<IProduct>(
     // Current Product State
     stock: { type: Number, required: true, index: true, default: 0 }, // A cached sum of all locations for fast sorting
     inventoryByLocation: [{ _id: false, locationId: { type: String, required: true }, quantity: { type: Number, default: 0 } }], // We may have different warehouses
-
     version: { type: Number, default: 0 }, // To prevent concurrent updates by > 1 Admins
   },
 
@@ -125,13 +124,12 @@ const ProductSchema = new Schema<IProduct>(
 // ⚡️ VIRTUALS - Variables on the fly
 // ==========================================
 
-// Is the product currently busy syncing?
 ProductSchema.virtual('isSyncing').get(function () {
   return this.mappings.amazon.syncStatus === SYNCING;
 });
 
 // ==========================================
-// 🛡 PRE-SAVE HOOKS - The integrity guard
+// 🛡 PRE-HOOKS - The integrity guard
 // ==========================================
 
 // PROBLEM: 'stock' and 'inventoryByLocation' can get out of sync.
