@@ -1,3 +1,5 @@
+'use server';
+
 // Types
 import { LoginFormValues, SignUpFormValues } from '@/types';
 

@@ -1,3 +1,5 @@
+'use server';
+
 // Next JS
 import { cookies } from 'next/headers';
 
