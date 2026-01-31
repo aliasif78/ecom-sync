@@ -5,6 +5,9 @@ import { Geist, Geist_Mono } from 'next/font/google';
 // Shadcn
 import { Toaster } from 'sonner';
 
+// Components
+import Navbar from '@/components/Navbar';
+
 // Styles
 import './globals.css';
 
@@ -19,8 +22,11 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
   return (
     <html lang="en">
       <body className={`${geistSans.variable} ${geistMono.variable} min-h-screen bg-slate-50 font-sans text-slate-900 antialiased`} suppressHydrationWarning>
-        <main>{children}</main>
-        <Toaster />
+        {/* ✅ The Navbar sits here. It decides internally whether to show up. */}
+        <Navbar />
+
+        <main className="min-h-screen bg-gray-50">{children}</main>
+        <Toaster richColors position="top-center" />
       </body>
     </html>
   );
