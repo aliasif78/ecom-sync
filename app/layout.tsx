@@ -18,7 +18,7 @@ export const metadata: Metadata = { title: 'EcomSync | Inventory Master', descri
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   return (
     <html lang="en">
-      <body className={`${geistSans.variable} ${geistMono.variable} min-h-screen bg-slate-50 font-sans text-slate-900 antialiased`}>
+      <body className={`${geistSans.variable} ${geistMono.variable} min-h-screen bg-slate-50 font-sans text-slate-900 antialiased`} suppressHydrationWarning>
         <main>{children}</main>
         <Toaster />
       </body>
