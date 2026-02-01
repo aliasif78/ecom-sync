@@ -16,7 +16,7 @@ const Page = async () => {
 
   return (
     // Page Container - Dark theme to match the table
-    <div className="min-h-screen bg-slate-950 p-8 font-sans text-slate-100">
+    <div className="min-h-screen bg-slate-950 p-8 pt-30 font-sans text-slate-100">
       <div className="mx-auto max-w-400 space-y-8">
         {/* Page Header Area */}
         <div className="flex flex-col justify-between gap-4 border-b border-slate-800 pb-6 md:flex-row md:items-end">

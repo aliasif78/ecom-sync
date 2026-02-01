@@ -24,11 +24,11 @@ export default function Navbar({ user }: NavbarProps) {
 
   return (
     // DARK MODE: bg-zinc-950, border-zinc-800
-    <nav className="sticky top-0 z-50 border-b border-zinc-800 bg-zinc-950/80 px-6 py-4 backdrop-blur-md">
+    <nav className="fixed top-0 z-50 w-full border-b border-zinc-800 bg-zinc-950/80 px-6 py-4 backdrop-blur-md">
       <div className="mx-auto flex max-w-7xl items-center justify-between">
         {/* 1. Logo */}
         <div className="flex items-center gap-8">
-          <Link href={user ? '/products' : '/'} className="flex items-center gap-2">
+          <Link href="/" className="flex items-center gap-2">
             <span className="text-xl font-bold tracking-tight text-white">
               Ecomm<span className="text-blue-500">Sync</span>
             </span>

@@ -29,11 +29,11 @@ export default async function RootLayout({ children }: Readonly<{ children: Reac
 
   return (
     <html lang="en">
-      <body className={`${geistSans.variable} ${geistMono.variable} min-h-screen bg-zinc-950 font-sans text-slate-900 antialiased`} suppressHydrationWarning>
+      <body className={`${geistSans.variable} ${geistMono.variable} relative min-h-screen bg-zinc-950 font-sans text-slate-50 antialiased`} suppressHydrationWarning>
         {/* ✅ The Navbar sits here. It decides internally whether to show up. */}
         <Navbar user={user} />
 
-        <main className="min-h-screen bg-gray-50">{children}</main>
+        <main className="min-h-screen bg-zinc-950">{children}</main>
         <Toaster richColors position="top-center" />
       </body>
     </html>

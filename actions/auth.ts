@@ -10,9 +10,6 @@ import User from '@/database/models/User';
 // Supabase
 import { createClient } from '@/lib/supabase/server';
 
-// Next Js
-import { redirect } from 'next/navigation';
-
 export const login = async (formData: LoginFormValues) => {
   // 1. Destructure form data
   const { email, password } = formData;
@@ -87,11 +84,11 @@ export const logout = async () => {
     // 2. Ask Supabase to sign out the user & kill the session
     const { error } = await supabase.auth.signOut();
     if (error) return { success: false, error: error.message };
+
+    // 3. Success
+    return { success: true, message: 'Logged out successfully' };
   } catch (error) {
     console.error(error);
     return { success: false, error };
   }
-
-  // 2. Redirect to login (This automatically clears the cookie cache in Next.js)
-  redirect('/login');
 };

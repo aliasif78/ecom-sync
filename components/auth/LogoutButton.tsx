@@ -3,6 +3,9 @@
 // React
 import { useState } from 'react';
 
+// Next Js
+import { useRouter } from 'next/navigation';
+
 // Server Actions
 import { logout } from '@/actions/auth';
 
@@ -13,11 +16,17 @@ export default function LogoutButton() {
   // States
   const [loading, setLoading] = useState(false);
 
+  // Router
+  const router = useRouter();
+
   // Functions
   const handleLogout = async () => {
     setLoading(true);
     try {
-      await logout();
+      const res = await logout();
+      toast.success(res.message || 'Logged out successfully');
+      router.push('/login'); // 👈 Navigate securely
+      router.refresh(); // 👈 Ensure all server data (Navbar user) is cleared
     } catch (error) {
       toast.error('Failed to logout');
       setLoading(false);
