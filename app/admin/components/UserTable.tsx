@@ -13,6 +13,9 @@ import { UserTableRow } from '@/types';
 import { toast } from 'sonner';
 import { ADMIN, NOT_VERIFIED, USER, VERIFIED } from '@/lib/globalConstants';
 
+// Utils
+import { formatDate } from '@/lib/utils';
+
 // Interfaces
 interface UserTableProps {
   users: UserTableRow[];
@@ -66,6 +69,7 @@ const UserTable = ({ users }: UserTableProps) => {
               <th className="px-6 py-4 font-medium">Role</th>
               <th className="px-6 py-4 font-medium">Status</th>
               <th className="px-6 py-4 font-medium">Last Active</th>
+              <th className="px-6 py-4 font-medium">Member Since</th>
               <th className="px-6 py-4 text-right font-medium">Actions</th>
             </tr>
           </thead>
@@ -98,7 +102,10 @@ const UserTable = ({ users }: UserTableProps) => {
                 </td>
 
                 {/* Last Active */}
-                <td className="px-6 py-4 text-zinc-500">{user.lastActive}</td>
+                <td className="px-6 py-4 text-zinc-500">{formatDate(user.lastActive) || 'N/A'}</td>
+
+                {/* Member Since */}
+                <td className="px-6 py-4 text-zinc-500">{formatDate(user.createdAt) || 'N/A'}</td>
 
                 {/* Actions */}
                 <td className="px-6 py-4 text-right">

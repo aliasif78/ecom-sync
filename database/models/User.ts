@@ -33,6 +33,7 @@ interface IUser extends Document {
   role?: (typeof ROLES)[number];
   paymentCredentials?: { stripe: { customerId: string; subscriptionId: string } };
   status: typeof VERIFIED | typeof NOT_VERIFIED;
+  lastActive: Date;
 
   // Supabase
   supabaseId: string;
@@ -60,6 +61,7 @@ const UserSchema = new Schema<IUser>(
     role: { type: String, enum: ROLES, default: 'USER' },
     paymentCredentials: { stripe: { customerId: String, subscriptionId: String } },
     status: { type: String, enum: [VERIFIED, NOT_VERIFIED], default: NOT_VERIFIED },
+    lastActive: { type: Date, default: Date.now },
 
     // Supabase ID
     supabaseId: { type: String, required: true, unique: true, index: true },

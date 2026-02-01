@@ -26,5 +26,6 @@ export type UserTableRow = {
   role: (typeof ROLES)[number];
   status: (typeof VERIFICATION)[number];
   lastActive: string;
+  createdAt: string;
   profilePicture?: string;
 };

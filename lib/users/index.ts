@@ -46,7 +46,7 @@ export const getAllUsers = async () => {
 
     // 3. Get all users
     const users = await User.find({})
-      .select('name email role createdAt status lastActive profilePicture') // 👈 ONLY fetch what you need
+      .select('name email role createdAt status lastActive createdAt profilePicture') // 👈 ONLY fetch what you need
       .sort({ createdAt: -1 }) // Newest users first
       .lean(); // 👈 CRITICAL: Converts to plain JSON, prevents Next.js serialization error
 
@@ -57,6 +57,8 @@ export const getAllUsers = async () => {
       ...user,
       _id: user._id.toString(),
       // If you have Date objects, they usually pass fine, but sometimes safer to .toISOString() them if you see warnings.
+      lastActive: user.lastActive?.toISOString() || 'N/A',
+      createdAt: user.createdAt?.toISOString() || 'N/A',
     }));
 
     // 5. Return the users
@@ -160,9 +162,9 @@ export const syncUserStatus = async (mongoId: string, supabaseId: string) => {
 
   // 2. Determine Status
   const realStatus = user.email_confirmed_at ? VERIFIED : NOT_VERIFIED;
+  const realLastActive = user.last_sign_in_at ? new Date(user.last_sign_in_at) : new Date();
 
   // 3. Update Mongo blindly (it's fast/cheap)
-  await User.findByIdAndUpdate(mongoId, { status: realStatus });
-
+  await User.findByIdAndUpdate(mongoId, { status: realStatus, lastActive: realLastActive });
   return realStatus;
 };
