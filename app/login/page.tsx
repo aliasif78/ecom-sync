@@ -7,6 +7,9 @@ import { useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 
+// Components
+import GoogleButton from '@/components/auth/GoogleButton';
+
 // Shadcn
 import { toast } from 'sonner';
 
@@ -209,6 +212,11 @@ export default function LoginPage() {
                 {isLogin ? 'Sign up now' : 'Sign in'}
               </button>
             </p>
+          </div>
+
+          {/* Google Button */}
+          <div className="mt-6 border-t border-slate-800 pt-4 text-center">
+            <GoogleButton />
           </div>
         </div>
       </div>
