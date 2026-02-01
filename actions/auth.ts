@@ -10,6 +10,9 @@ import User from '@/database/models/User';
 // Supabase
 import { createClient } from '@/lib/supabase/server';
 
+// BE Functions
+import { syncUserStatus } from '@/lib/users';
+
 export const login = async (formData: LoginFormValues) => {
   // 1. Destructure form data
   const { email, password } = formData;
@@ -28,7 +31,10 @@ export const login = async (formData: LoginFormValues) => {
     const user = await User.findOne({ email });
     if (!user) return { success: false, error: 'User not found' };
 
-    // 5. Authenticated successfully
+    // 5. Sync the user status
+    await syncUserStatus(user._id.toString(), user.supabaseId);
+
+    // 6. Authenticated successfully
     return { success: true, user: JSON.parse(JSON.stringify(user)) };
   } catch (error) {
     // Something went wrong

@@ -1,3 +1,6 @@
+// Constants
+import { VERIFICATION, ROLES } from '@/lib/globalConstants';
+
 export type LoginFormValues = {
   email: string;
   password: string;
@@ -20,8 +23,8 @@ export type UserTableRow = {
   _id: string;
   name: string;
   email: string;
-  role: 'admin' | 'user';
-  status: 'active' | 'banned';
+  role: (typeof ROLES)[number];
+  status: (typeof VERIFICATION)[number];
   lastActive: string;
   profilePicture?: string;
 };

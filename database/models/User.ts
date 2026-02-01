@@ -14,7 +14,7 @@
 import { Schema, models, model, Document } from 'mongoose';
 
 // Constants
-import { ROLES } from '../../lib/globalConstants';
+import { ROLES, VERIFIED, NOT_VERIFIED } from '../../lib/globalConstants';
 
 // ==========================================
 // 💿 CONSTANTS
@@ -32,6 +32,7 @@ interface IUser extends Document {
   profilePicture?: string;
   role?: (typeof ROLES)[number];
   paymentCredentials?: { stripe: { customerId: string; subscriptionId: string } };
+  status: typeof VERIFIED | typeof NOT_VERIFIED;
 
   // Supabase
   supabaseId: string;
@@ -58,6 +59,7 @@ const UserSchema = new Schema<IUser>(
     profilePicture: { type: String },
     role: { type: String, enum: ROLES, default: 'USER' },
     paymentCredentials: { stripe: { customerId: String, subscriptionId: String } },
+    status: { type: String, enum: [VERIFIED, NOT_VERIFIED], default: NOT_VERIFIED },
 
     // Supabase ID
     supabaseId: { type: String, required: true, unique: true, index: true },

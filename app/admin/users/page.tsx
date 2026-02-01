@@ -1,6 +1,9 @@
 // Components
 import UserTable from '../components/UserTable';
 
+// Constants
+import { VERIFIED } from '@/lib/globalConstants';
+
 // Server Actions
 import { getAllUsers } from '@/lib/users';
 
@@ -25,8 +28,8 @@ export default async function AdminUsersPage() {
           </div>
 
           <div className="rounded-lg border border-zinc-800 bg-zinc-900 px-4 py-2 text-center">
-            <span className="block text-2xl font-bold text-green-500">{users.filter((u) => u.status === 'active').length}</span>
-            <span className="text-xs tracking-wider text-zinc-500 uppercase">Active</span>
+            <span className="block text-2xl font-bold text-green-500">{users.filter((u) => u.status === VERIFIED).length}</span>
+            <span className="text-xs tracking-wider text-zinc-500 uppercase">Verified</span>
           </div>
         </div>
       </div>

@@ -6,11 +6,15 @@ import { connectDB } from '@/database/mongoose';
 import { createAdminClient } from '../supabase/admin'; // For executing high-privilege commands
 import { createClient } from '../supabase/server'; // For checking WHO is making the request
 
+// Constants
+import { VERIFIED, NOT_VERIFIED } from '../globalConstants';
+
 // Helpers
 const getCurrentSbUser = async () => {
   const supabase = await createClient();
   const { data } = await supabase.auth.getUser();
   const currentUser = data?.user;
+
   if (!currentUser) throw new Error('Unauthorized: No session');
   return currentUser;
 };
@@ -42,7 +46,7 @@ export const getAllUsers = async () => {
 
     // 3. Get all users
     const users = await User.find({})
-      .select('name email role createdAt lastActive profilePicture') // 👈 ONLY fetch what you need
+      .select('name email role createdAt status lastActive profilePicture') // 👈 ONLY fetch what you need
       .sort({ createdAt: -1 }) // Newest users first
       .lean(); // 👈 CRITICAL: Converts to plain JSON, prevents Next.js serialization error
 
@@ -144,4 +148,21 @@ export const deleteUserById = async (id: string) => {
     console.error(error);
     return { success: false, message: 'Failed to delete user' };
   }
+};
+
+export const syncUserStatus = async (mongoId: string, supabaseId: string) => {
+  const supabase = createAdminClient();
+
+  // 1. Ask Supabase for the TRUTH
+  const { data, error } = await supabase.auth.admin.getUserById(supabaseId);
+  const { user } = data;
+  if (error || !user) return;
+
+  // 2. Determine Status
+  const realStatus = user.email_confirmed_at ? VERIFIED : NOT_VERIFIED;
+
+  // 3. Update Mongo blindly (it's fast/cheap)
+  await User.findByIdAndUpdate(mongoId, { status: realStatus });
+
+  return realStatus;
 };
