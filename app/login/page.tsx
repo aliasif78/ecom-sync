@@ -212,6 +212,15 @@ export default function LoginPage() {
                 {isLogin ? 'Sign up now' : 'Sign in'}
               </button>
             </p>
+
+            {/* Forgot password */}
+            {isLogin && (
+              <p className="text-sm text-slate-400">
+                <Link href="/login/forgot-password" className="font-medium text-indigo-400 transition-colors hover:text-indigo-300 hover:underline focus:outline-none">
+                  Forgot password?
+                </Link>
+              </p>
+            )}
           </div>
 
           {/* Google Button */}

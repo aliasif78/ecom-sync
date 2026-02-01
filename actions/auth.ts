@@ -92,3 +92,49 @@ export const logout = async () => {
     return { success: false, error };
   }
 };
+
+// Forgot Password
+// 1. Send the 6-digit code
+export async function sendPasswordResetOtp(email: string) {
+  // 1. Connect to Supabase
+  const supabase = await createClient();
+
+  // 2. We use signInWithOtp to generate a 6-digit code.
+  // We set shouldCreateUser: false because we only want to reset existing accounts.
+  const { error } = await supabase.auth.signInWithOtp({ email, options: { shouldCreateUser: false } });
+
+  // 3. Handle result
+  if (error) return { success: false, error: error.message };
+  return { success: true };
+}
+
+// 2. Verify the code
+export async function verifyOtp(email: string, token: string) {
+  // 1. Connect to Supabase
+  const supabase = await createClient();
+
+  // 2. Verify the OTP. If valid, Supabase creates a Session for this user.
+  const { error } = await supabase.auth.verifyOtp({ email, token, type: 'email' });
+
+  // 3. Handle result
+  if (error) return { success: false, error: error.message };
+  return { success: true };
+}
+
+// 3. Update the password (Must be called AFTER verifyOtp)
+export async function updatePassword(password: string) {
+  // 1. Connect to Supabase
+  const supabase = await createClient();
+
+  // 2. Since we verified the OTP in step 2, we have a session.
+  // We can now securely update the password.
+  const { error } = await supabase.auth.updateUser({ password });
+  console.log(123, error);
+
+  // 3. Force a clean sign out so the invalid session doesn't crash the response
+  await supabase.auth.signOut();
+
+  // 4. Handle result
+  if (error) return { success: false, error: error.message };
+  return { success: true };
+}
