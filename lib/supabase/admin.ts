@@ -5,9 +5,9 @@ import { createClient } from '@supabase/supabase-js';
 import { getEnvVariables } from './utils';
 
 export const createAdminClient = () => {
-  const { supabaseUrl, supabaseServiceKey } = getEnvVariables();
+  const { supabaseUrl, supabaseSecretKey } = getEnvVariables();
 
-  return createClient(supabaseUrl!, supabaseServiceKey!, {
+  return createClient(supabaseUrl!, supabaseSecretKey!, {
     auth: {
       autoRefreshToken: false,
       persistSession: false,

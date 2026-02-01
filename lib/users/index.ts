@@ -59,7 +59,7 @@ export const getAllUsers = async () => {
     return { success: true, users: sanitizedUsers };
   } catch (error) {
     console.error(error);
-    return { success: false, error: 'Failed to get users' };
+    return { success: false, message: 'Failed to get users', users: [] };
   }
 };
 
