@@ -84,7 +84,7 @@ const ProductSchema = new Schema<IProduct>(
     // Common
     sku: { type: String, required: true, unique: true, index: true, uppercase: true, trim: true }, // Primary Key - immutable
     name: { type: String, required: true },
-    price: { type: Number, required: true },
+    price: { type: Number, required: true, min: [0, 'Price cannot be negative'] },
     image: { type: String, required: true },
 
     // The Adapter Pattern: Mappings strictly typed
