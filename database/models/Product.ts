@@ -187,8 +187,5 @@ ProductSchema.index({ userId: 1, sku: 1 }, { unique: true });
 
 // Others, done inside the model definition using the 'index' or 'sparse' options
 
-// ProductSchema.index({ 'mappings.shopify.variantId': 1 });
-// ProductSchema.index({ 'mappings.amazon.asin': 1 });
-
 const Product = (models.Product as IProductModel) || model<IProduct, IProductModel>('Product', ProductSchema);
 export default Product;

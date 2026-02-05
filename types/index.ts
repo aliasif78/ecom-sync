@@ -29,3 +29,14 @@ export type UserTableRow = {
   createdAt: string;
   profilePicture?: string;
 };
+
+export type ProductRow = {
+  _id: string;
+  sku: string;
+  name: string;
+  price: number;
+  stock: number;
+  image: string;
+  createdAt?: string; // It comes as a string from the server
+  updatedAt?: string;
+};

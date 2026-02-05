@@ -1,11 +1,11 @@
 // Providers
-import { SyncModalProvider } from '@/contexts/SyncModalProvider';
+import { ProductModalsProvider } from '@/contexts/SyncModalProvider';
 
 export default function ProductsLayout({ children }: { children: React.ReactNode }) {
   return (
-    <SyncModalProvider>
+    <ProductModalsProvider>
       {/* All child pages now have access to the modal */}
       {children}
-    </SyncModalProvider>
+    </ProductModalsProvider>
   );
 }
