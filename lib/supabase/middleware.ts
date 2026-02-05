@@ -5,7 +5,7 @@ import { createServerClient } from '@supabase/ssr';
 import { NextResponse, type NextRequest } from 'next/server';
 
 // Utils
-import { getEnvVariables } from './utils';
+import { getEnvVariables } from './utils/clientUtils';
 
 export async function updateSession(request: NextRequest) {
   // 1. Prepare the response (we might need to modify headers)

@@ -11,10 +11,15 @@ import { UserTableRow } from '@/types';
 
 // Shadcn
 import { toast } from 'sonner';
+
+// Constants
 import { ADMIN, NOT_VERIFIED, USER, VERIFIED } from '@/lib/globalConstants';
 
 // Utils
 import { formatDate } from '@/lib/utils';
+
+// Actions
+import { deleteUser, updateUser } from '@/actions/admin/users';
 
 // Interfaces
 interface UserTableProps {
@@ -26,27 +31,49 @@ const UserTable = ({ users }: UserTableProps) => {
   const [search, setSearch] = useState('');
   const [isEditOpen, setIsEditOpen] = useState(false);
   const [selectedUser, setSelectedUser] = useState<UserTableRow | null>(null);
+  const [name, setName] = useState('');
+  const [role, setRole] = useState('');
 
   // Rendering Constants
   const filteredUsers = users.filter((user) => user.name.toLowerCase().includes(search.toLowerCase()) || user.email.toLowerCase().includes(search.toLowerCase()));
 
   // Handlers
-  const handleDelete = (id: string) => {
+  const handleDelete = async (id: string) => {
     if (confirm('Are you sure you want to delete this user? This cannot be undone.')) {
-      toast.success('User deleted successfully');
+      const { success, message } = await deleteUser(id);
+      if (success) toast.success('User deleted successfully');
+      else toast.error(message);
     }
   };
 
   const handleEditClick = (user: UserTableRow) => {
     setSelectedUser(user);
+    setName(user.name);
+    setRole(user.role);
     setIsEditOpen(true);
   };
 
-  const handleSaveUser = (e: React.FormEvent) => {
-    e.preventDefault();
-    // TODO: Call your UPDATE API here
-    toast.success('User updated successfully');
+  const closeModal = () => {
     setIsEditOpen(false);
+    setSelectedUser(null);
+    setName('');
+    setRole('');
+  };
+
+  const handleSaveUser = async (e: React.FormEvent) => {
+    if (!selectedUser) return; // Safety Check
+    e.preventDefault();
+
+    // Update user
+    const { success, message } = await updateUser(selectedUser._id, name || selectedUser.name, role);
+
+    // Success
+    if (success) toast.success('User updated successfully');
+    // Error
+    else toast.error(message);
+
+    // Close the modal
+    closeModal();
   };
 
   return (
@@ -113,6 +140,7 @@ const UserTable = ({ users }: UserTableProps) => {
                     <button onClick={() => handleEditClick(user)} className="rounded p-2 text-zinc-400 hover:bg-zinc-800 hover:text-white">
                       Edit
                     </button>
+
                     <button onClick={() => handleDelete(user._id)} className="rounded p-2 text-red-400 hover:bg-red-500/10 hover:text-red-300">
                       Delete
                     </button>
@@ -135,7 +163,7 @@ const UserTable = ({ users }: UserTableProps) => {
             <form onSubmit={handleSaveUser} className="space-y-4">
               <div>
                 <label className="mb-1 block text-xs font-medium text-zinc-400">Full Name</label>
-                <input defaultValue={selectedUser.name} className="w-full rounded-lg border border-zinc-700 bg-zinc-950 p-2.5 text-white focus:ring-2 focus:ring-blue-600 focus:outline-none" />
+                <input value={name} onChange={(e) => setName(e.target.value)} className="w-full rounded-lg border border-zinc-700 bg-zinc-950 p-2.5 text-white focus:ring-2 focus:ring-blue-600 focus:outline-none" />
               </div>
 
               <div>
@@ -146,9 +174,9 @@ const UserTable = ({ users }: UserTableProps) => {
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="mb-1 block text-xs font-medium text-zinc-400">Role</label>
-                  <select defaultValue={selectedUser.role} className="w-full rounded-lg border border-zinc-700 bg-zinc-950 p-2.5 text-white focus:ring-2 focus:ring-blue-600 focus:outline-none">
-                    <option value="user">User</option>
-                    <option value="admin">Admin</option>
+                  <select value={role} onChange={(e) => setRole(e.target.value)} className="w-full rounded-lg border border-zinc-700 bg-zinc-950 p-2.5 text-white focus:ring-2 focus:ring-blue-600 focus:outline-none">
+                    <option value={USER}>User</option>
+                    <option value={ADMIN}>Admin</option>
                   </select>
                 </div>
                 <div>
@@ -161,7 +189,7 @@ const UserTable = ({ users }: UserTableProps) => {
               </div>
 
               <div className="mt-8 flex justify-end gap-3">
-                <button type="button" onClick={() => setIsEditOpen(false)} className="rounded-lg px-4 py-2 text-sm font-medium text-zinc-400 transition-colors hover:bg-zinc-800 hover:text-white">
+                <button type="button" onClick={closeModal} className="rounded-lg px-4 py-2 text-sm font-medium text-zinc-400 transition-colors hover:bg-zinc-800 hover:text-white">
                   Cancel
                 </button>
                 <button type="submit" className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-bold text-white transition-colors hover:bg-blue-500">

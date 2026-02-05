@@ -7,7 +7,7 @@ import { cookies } from 'next/headers';
 import { createServerClient } from '@supabase/ssr';
 
 // Utils
-import { getEnvVariables } from './utils';
+import { getEnvVariables } from './utils/clientUtils';
 
 // Will be used by server components
 export const createClient = async () => {

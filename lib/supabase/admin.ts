@@ -2,7 +2,7 @@
 import { createClient } from '@supabase/supabase-js';
 
 // Utils
-import { getEnvVariables } from './utils';
+import { getEnvVariables } from './utils/serverUtils';
 
 export const createAdminClient = () => {
   const { supabaseUrl, supabaseSecretKey } = getEnvVariables();

@@ -2,7 +2,7 @@
 import { createBrowserClient } from '@supabase/ssr';
 
 // Utils
-import { getEnvVariables } from './utils';
+import { getEnvVariables } from './utils/clientUtils';
 
 // Will be used by client components
 export const createClient = () => {
