@@ -28,6 +28,25 @@ export async function getProducts() {
   }
 }
 
+export async function verifyProductOwnership(_id: string, userId: string) {
+  try {
+    // 1. Connect to the DB
+    await connectDB();
+
+    // 2. Fetch product
+    // ⚡️ SUPER FAST QUERY
+    // This only checks the index. It does not load the document.
+    const exists = await Product.exists({ _id, userId: new Types.ObjectId(userId) });
+
+    // 3. Return true/false
+    // .exists() returns the { _id } object if found, or null if not.
+    return !!exists;
+  } catch (error) {
+    console.error('🚩 VERIFY_PRODUCT_OWNERSHIP_ERROR:', error);
+    return false;
+  }
+}
+
 export async function addProductByUserId({ userId, name, price, image, sku, stock }: { userId: string; name: string; price: number; image: string; sku: string; stock: number }) {
   try {
     // 1. Safety Check
