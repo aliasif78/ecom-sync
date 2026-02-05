@@ -31,24 +31,18 @@ export function ProductModalsProvider({ children }: { children: ReactNode }) {
   const [selectedProduct, setSelectedProduct] = useState<ProductRow | null>(null);
 
   // --- Handlers ---
-
-  const openSyncModal = (product: ProductRow) => {
-    setSelectedProduct(product);
-    setActiveModal('SYNC');
+  const openModalHelper = (modalType: ModalType, product?: ProductRow) => {
+    setSelectedProduct(product || null);
+    setActiveModal(modalType);
   };
 
-  const openEditModal = (product: ProductRow) => {
-    setSelectedProduct(product);
-    setActiveModal('EDIT');
-  };
-
-  const openAddModal = () => {
-    setSelectedProduct(null); // Clear selection for fresh add
-    setActiveModal('ADD');
-  };
+  const openSyncModal = (product: ProductRow) => openModalHelper('SYNC', product);
+  const openEditModal = (product: ProductRow) => openModalHelper('EDIT', product);
+  const openAddModal = () => openModalHelper('ADD');
 
   const closeModal = () => {
     setActiveModal(null);
+
     // Optional: wait for animation to finish before clearing product,
     // but usually setting it to null immediately is fine.
     setTimeout(() => setSelectedProduct(null), 300);
@@ -61,16 +55,10 @@ export function ProductModalsProvider({ children }: { children: ReactNode }) {
       {/* --- The Modals Layer --- */}
 
       {/* 1. Sync Modal */}
-      {activeModal === 'SYNC' && selectedProduct && <SyncStockModal isOpen={true} onClose={closeModal} product={selectedProduct} />}
+      {activeModal === 'SYNC' && selectedProduct && <SyncStockModal key={selectedProduct._id} isOpen={true} onClose={closeModal} product={selectedProduct} />}
 
       {/* 2. Edit Modal */}
-      {activeModal === 'EDIT' && selectedProduct && (
-        <EditProductModal
-          isOpen={true}
-          onClose={closeModal}
-          product={selectedProduct} // Pass the product to pre-fill the form
-        />
-      )}
+      {activeModal === 'EDIT' && selectedProduct && <EditProductModal key={selectedProduct._id} isOpen={true} onClose={closeModal} product={selectedProduct} />}
 
       {/* 3. Add Modal */}
       {activeModal === 'ADD' && <AddProductModal isOpen={true} onClose={closeModal} />}
