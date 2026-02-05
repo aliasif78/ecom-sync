@@ -5,75 +5,59 @@ import { revalidatePath } from 'next/cache';
 
 // BE Functions
 import { getCurrentUser } from '@/lib/users';
-import { addProductByUserId, deleteProductById } from '@/lib/products';
+import { addProductByUserId, deleteProductById, updateProductById } from '@/lib/products';
 
-export async function addProduct({ name, price, image, sku, stock }: { name: string; price: number; image: string; sku: string; stock: number }) {
+// ---------------------------------------------------------
+// The Generic Wrapper
+// ---------------------------------------------------------
+async function runProtectedAction(tag: string, fn: (userId: string) => Promise<{ success: boolean; message: string }>, path: string = '/products') {
   try {
-    // 1. Safety Checks
-    if (!name || !price || !image || !sku || stock === undefined) {
-      console.error('🚩 ADD_PRODUCT_ERROR: Missing required fields');
-      return { success: false, message: 'Missing required fields' };
-    }
-
-    // 2. Get current user
+    // 1. Centralized Auth
     const { success, user, message } = await getCurrentUser();
-
-    if (!success) {
-      console.error('🚩 ADD_PRODUCT_ERROR: User not found');
-      return { success: false, message };
+    if (!success || !user) {
+      console.error(`🚩 ${tag}_ERROR: User not found`);
+      return { success: false, message: message || 'Unauthorized' };
     }
 
-    // 3. Add product
-    const res = await addProductByUserId({ userId: user._id, name, price, image, sku, stock });
+    // 2. Execute the Business Logic
+    const res = await fn(user._id);
 
+    // 3. Centralized Error Handling
     if (!res.success) {
-      console.error('🚩 ADD_PRODUCT_ERROR: Failed to add product');
-      return { success: false, message: res.message };
+      console.error(`🚩 ${tag}_ERROR: ${res.message}`);
+      return res;
     }
 
-    // 4. Tell Next Js to refetch the products
-    revalidatePath('/products');
-
-    // 5. Return result
-    return { success: true, message: 'Product added successfully!' };
+    // 4. Centralized Revalidation
+    revalidatePath(path);
+    return res;
   } catch (error) {
-    console.error('🚩 ADD_PRODUCT_ERROR:', error);
-    return { success: false, message: 'Failed to add product' };
+    console.error(`🚩 ${tag}_CRITICAL_ERROR:`, error);
+    return { success: false, message: `Failed to execute ${tag}` };
   }
 }
 
+// ---------------------------------------------------------
+// 1. Add Product
+// ---------------------------------------------------------
+export async function addProduct(data: { name: string; price: number; image: string; sku: string; stock: number }) {
+  // Unique Input Validation
+  if (!data.name || !data.price || !data.image || !data.sku || data.stock === undefined) return { success: false, message: 'Missing required fields' };
+  return runProtectedAction('ADD_PRODUCT', (userId) => addProductByUserId({ userId, ...data }));
+}
+
+// ---------------------------------------------------------
+// 2. Delete Product
+// ---------------------------------------------------------
 export async function deleteProduct(_id: string) {
-  try {
-    // 1. Safety Checks
-    if (!_id) {
-      console.error('🚩 DELETE_PRODUCT_ERROR: Missing required fields');
-      return { success: false, message: 'Missing required fields' };
-    }
+  if (!_id) return { success: false, message: 'Missing required fields' };
+  return runProtectedAction('DELETE_PRODUCT', (userId) => deleteProductById({ userId, _id }));
+}
 
-    // 2. Get current user
-    const { success, user, message } = await getCurrentUser();
-
-    if (!success) {
-      console.error('🚩 DELETE_PRODUCT_ERROR: User not found');
-      return { success: false, message };
-    }
-
-    // 3. Delete (Implicitly verifies ownership) 🛡️
-    // If user doesn't own it, this returns success: false, message: 'Product not found'
-    const res = await deleteProductById({ userId: user._id, _id });
-
-    if (!res.success) {
-      console.error('🚩 DELETE_PRODUCT_ERROR: Failed to delete product');
-      return { success: false, message: res.message };
-    }
-
-    // 4. Tell Next Js to refetch the products
-    revalidatePath('/products');
-
-    // 5. Return result
-    return { success: true, message: 'Product deleted successfully!' };
-  } catch (error) {
-    console.error('🚩 DELETE_PRODUCT_ERROR:', error);
-    return { success: false, message: 'Failed to delete product' };
-  }
+// ---------------------------------------------------------
+// 3. Update Product
+// ---------------------------------------------------------
+export async function updateProduct(data: { _id: string; name: string; price: number; image: string }) {
+  if (!data._id || !data.name || data.price === undefined || !data.image) return { success: false, message: 'Missing required fields' };
+  return runProtectedAction('UPDATE_PRODUCT', (userId) => updateProductById({ userId, ...data }));
 }
