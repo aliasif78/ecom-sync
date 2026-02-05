@@ -69,10 +69,10 @@ export const getAllUsers = async () => {
   }
 };
 
-export const updateUserById = async (id: string, data: { role?: string; name?: string }) => {
+export const updateUserById = async (id: string, data: { role?: string; name?: string; status?: string }) => {
   // Safety Check
-  const { name, role } = data;
-  if (!id || (!name && !role)) return { success: false, error: 'No data provided' };
+  const { name, role, status } = data;
+  if (!id || (!name && !role && !status)) return { success: false, error: 'No data provided' };
 
   try {
     // 1. Connect to the database
@@ -87,9 +87,10 @@ export const updateUserById = async (id: string, data: { role?: string; name?: s
     if (role && !isAdmin) return { success: false, message: 'Unauthorized' }; // Only admin can change roles
 
     // 4. Build the user metadata for supabase
-    const supabaseUpdates: { user_metadata?: { full_name?: string }; app_metadata?: { role?: string } } = {};
+    const supabaseUpdates: { user_metadata?: { full_name?: string }; app_metadata?: { role?: string }; email_confirmed_at?: string | null } = {};
     if (name) supabaseUpdates.user_metadata = { full_name: name };
     if (role) supabaseUpdates.app_metadata = { role };
+    if (status) supabaseUpdates.email_confirmed_at = status === VERIFIED ? new Date().toISOString() : null;
 
     // 5. Update in Supabase
     const supabaseAdmin = createAdminClient();
@@ -101,9 +102,10 @@ export const updateUserById = async (id: string, data: { role?: string; name?: s
     }
 
     // 6. Build the update object for the Mongo DB
-    const mongoUpdates: { name?: string; role?: string } = {};
+    const mongoUpdates: { name?: string; role?: string; status?: string } = {};
     if (name) mongoUpdates.name = name;
     if (role) mongoUpdates.role = role;
+    if (status) mongoUpdates.status = status;
 
     // 7. Update in the Mongo DB
     const updatedUser = await User.findByIdAndUpdate(id, mongoUpdates, { new: true });

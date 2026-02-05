@@ -1,5 +1,8 @@
+// React
+import { useState } from 'react';
+
 // Constants
-import { ADMIN, USER } from '@/lib/globalConstants';
+import { ADMIN, NOT_VERIFIED, USER, VERIFIED } from '@/lib/globalConstants';
 
 // Types
 import { UserTableRow } from '@/types';
@@ -13,22 +16,23 @@ import { updateUser } from '@/actions/admin/users';
 // Interfaces
 interface props {
   selectedUser: UserTableRow;
-  name: string;
-  setName: (name: string) => void;
-  role: string;
-  setRole: (role: string) => void;
   setIsEditOpen: (isEditOpen: boolean) => void;
   setSelectedUser: (selectedUser: UserTableRow | null) => void;
 }
 
-const EditModal = ({ selectedUser, name, setName, role, setRole, setIsEditOpen, setSelectedUser }: props) => {
+const EditModal = ({ selectedUser, setIsEditOpen, setSelectedUser }: props) => {
+  // States
+  const [name, setName] = useState(selectedUser?.name || '');
+  const [role, setRole] = useState(selectedUser?.role || USER);
+  const [status, setStatus] = useState(selectedUser?.status || NOT_VERIFIED);
+
   // Functions
   const handleSaveUser = async (e: React.FormEvent) => {
     if (!selectedUser) return; // Safety Check
     e.preventDefault();
 
     // Update user
-    const { success, message } = await updateUser(selectedUser._id, name || selectedUser.name, role);
+    const { success, message } = await updateUser(selectedUser._id, name || selectedUser.name, role || selectedUser.role, status || selectedUser.status);
 
     // Success
     if (success) toast.success('User updated successfully');
@@ -71,10 +75,10 @@ const EditModal = ({ selectedUser, name, setName, role, setRole, setIsEditOpen, 
               </select>
             </div>
             <div>
-              <label className="mb-1 block text-xs font-medium text-zinc-400">Status</label>
-              <select defaultValue={selectedUser.status} className="w-full rounded-lg border border-zinc-700 bg-zinc-950 p-2.5 text-white focus:ring-2 focus:ring-blue-600 focus:outline-none">
-                <option value="active">Active</option>
-                <option value="banned">Banned</option>
+              <label className="mb-1 block text-xs font-medium text-zinc-400">Email Verified</label>
+              <select value={status} onChange={(e) => setStatus(e.target.value)} className="w-full rounded-lg border border-zinc-700 bg-zinc-950 p-2.5 text-white focus:ring-2 focus:ring-blue-600 focus:outline-none">
+                <option value={VERIFIED}>Yes</option>
+                <option value={NOT_VERIFIED}>No</option>
               </select>
             </div>
           </div>

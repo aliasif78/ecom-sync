@@ -34,8 +34,6 @@ const UserTable = ({ users }: UserTableProps) => {
   const [search, setSearch] = useState('');
   const [isEditOpen, setIsEditOpen] = useState(false);
   const [selectedUser, setSelectedUser] = useState<UserTableRow | null>(null);
-  const [name, setName] = useState('');
-  const [role, setRole] = useState('');
 
   // Rendering Constants
   const filteredUsers = users.filter((user) => user.name.toLowerCase().includes(search.toLowerCase()) || user.email.toLowerCase().includes(search.toLowerCase()));
@@ -51,8 +49,6 @@ const UserTable = ({ users }: UserTableProps) => {
 
   const handleEditClick = (user: UserTableRow) => {
     setSelectedUser(user);
-    setName(user.name);
-    setRole(user.role);
     setIsEditOpen(true);
   };
 
@@ -135,7 +131,7 @@ const UserTable = ({ users }: UserTableProps) => {
       </div>
 
       {/* 3. Edit User Modal (Simple Overlay) */}
-      {isEditOpen && selectedUser && <EditModal selectedUser={selectedUser} name={name} setName={setName} role={role} setRole={setRole} setIsEditOpen={setIsEditOpen} setSelectedUser={setSelectedUser} />}
+      {isEditOpen && selectedUser && <EditModal key={selectedUser?._id || 'empty'} selectedUser={selectedUser} setIsEditOpen={setIsEditOpen} setSelectedUser={setSelectedUser} />}
     </>
   );
 };
