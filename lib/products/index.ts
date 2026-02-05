@@ -28,7 +28,7 @@ export async function getProducts() {
   }
 }
 
-export async function addProduct({ userId, name, price, image, sku, stock }: { userId: string; name: string; price: number; image: string; sku: string; stock: number }) {
+export async function addProductByUserId({ userId, name, price, image, sku, stock }: { userId: string; name: string; price: number; image: string; sku: string; stock: number }) {
   try {
     // 1. Safety Check
     if (!userId || !name || !price || !image || !sku || stock === undefined) {
@@ -59,7 +59,7 @@ export async function addProduct({ userId, name, price, image, sku, stock }: { u
   }
 }
 
-export async function updateProduct({ userId, _id, name, price, image }: { userId: string; _id: string; name?: string; price?: number; image?: string }) {
+export async function updateProductById({ userId, _id, name, price, image }: { userId: string; _id: string; name?: string; price?: number; image?: string }) {
   try {
     // 1. Safety Checks
     if (!userId || !_id || (!name && price === undefined && !image)) {
@@ -88,7 +88,7 @@ export async function updateProduct({ userId, _id, name, price, image }: { userI
   }
 }
 
-export async function deleteProduct({ _id, userId }: { _id: string; userId: string }) {
+export async function deleteProductById({ _id, userId }: { _id: string; userId: string }) {
   try {
     // 1. Safety Checks
     if (!userId || !_id) {
