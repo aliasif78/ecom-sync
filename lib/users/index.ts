@@ -170,3 +170,20 @@ export const syncUserStatus = async (mongoId: string, supabaseId: string) => {
   await User.findByIdAndUpdate(mongoId, { status: realStatus, lastActive: realLastActive });
   return realStatus;
 };
+
+export const getCurrentUser = async () => {
+  try {
+    // 1. Get the current user logged into supabase
+    const supabaseUser = await getCurrentSbUser();
+
+    // 2. Use the supabase id to find the user in the mongo db
+    const user = await User.findOne({ supabaseId: supabaseUser.id });
+    if (!user) return { success: false, message: 'User not found in mongo db' };
+
+    // 3. Return the current user
+    return { success: true, user };
+  } catch (error) {
+    console.error(error);
+    return { success: false, message: 'Failed to get current user' };
+  }
+};

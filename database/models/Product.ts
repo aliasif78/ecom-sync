@@ -18,7 +18,7 @@
 // ==========================================
 
 // Dependencies
-import { Schema, models, model, Model, Document } from 'mongoose';
+import { Schema, models, model, Model, Document, Types } from 'mongoose';
 
 // Constants
 import { SHOPIFY, WOOCOMMERCE, AMAZON } from '@/lib/globalConstants';
@@ -42,7 +42,7 @@ export interface IInventoryLevel {
 }
 
 export interface IProduct extends Document {
-  userId: Schema.Types.ObjectId;
+  userId: Types.ObjectId;
   sku: string;
   name: string;
   price: number;
@@ -79,7 +79,7 @@ interface IProductModel extends Model<IProduct> {
 const ProductSchema = new Schema<IProduct>(
   {
     // 🔒 OWNERSHIP
-    userId: { type: Schema.Types.ObjectId, ref: 'User', required: true, index: true },
+    userId: { type: Types.ObjectId, ref: 'User', required: true, index: true },
 
     // Common
     sku: { type: String, required: true, unique: true, index: true, uppercase: true, trim: true }, // Primary Key - immutable
