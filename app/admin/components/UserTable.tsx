@@ -19,7 +19,10 @@ import { ADMIN, NOT_VERIFIED, USER, VERIFIED } from '@/lib/globalConstants';
 import { formatDate } from '@/lib/utils';
 
 // Actions
-import { deleteUser, updateUser } from '@/actions/admin/users';
+import { deleteUser } from '@/actions/admin/users';
+
+// Components
+import EditModal from './EditModal';
 
 // Interfaces
 interface UserTableProps {
@@ -53,32 +56,9 @@ const UserTable = ({ users }: UserTableProps) => {
     setIsEditOpen(true);
   };
 
-  const closeModal = () => {
-    setIsEditOpen(false);
-    setSelectedUser(null);
-    setName('');
-    setRole('');
-  };
-
-  const handleSaveUser = async (e: React.FormEvent) => {
-    if (!selectedUser) return; // Safety Check
-    e.preventDefault();
-
-    // Update user
-    const { success, message } = await updateUser(selectedUser._id, name || selectedUser.name, role);
-
-    // Success
-    if (success) toast.success('User updated successfully');
-    // Error
-    else toast.error(message);
-
-    // Close the modal
-    closeModal();
-  };
-
   return (
     <>
-      {/* 2. Controls */}
+      {/* 1. Controls */}
       <div className="relative mb-6 flex w-full max-w-sm items-center justify-between rounded-xl border border-zinc-800 bg-zinc-900 p-4">
         <svg className="absolute top-1/2 left-7.5 h-4 w-4 -translate-y-1/2 text-zinc-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
@@ -87,7 +67,7 @@ const UserTable = ({ users }: UserTableProps) => {
         <input type="text" placeholder="Search users..." value={search} onChange={(e) => setSearch(e.target.value)} className="w-full rounded-lg border border-zinc-700 bg-zinc-950 py-2 pr-4 pl-10 text-sm text-white placeholder-zinc-500 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 focus:outline-none" />
       </div>
 
-      {/* 3. The Table */}
+      {/* 2. The Table */}
       <div className="overflow-hidden rounded-xl border border-zinc-800 bg-zinc-900">
         <table className="w-full text-left text-sm">
           <thead className="bg-zinc-950 text-zinc-400">
@@ -154,52 +134,8 @@ const UserTable = ({ users }: UserTableProps) => {
         {filteredUsers.length === 0 && <div className="p-12 text-center text-zinc-500">No users found matching &quot;{search}&quot;</div>}
       </div>
 
-      {/* 4. Edit User Modal (Simple Overlay) */}
-      {isEditOpen && selectedUser && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4 backdrop-blur-sm">
-          <div className="animate-in fade-in zoom-in-95 w-full max-w-lg rounded-2xl border border-zinc-800 bg-zinc-900 p-6 shadow-2xl duration-200">
-            <h2 className="mb-6 text-xl font-bold text-white">Edit User</h2>
-
-            <form onSubmit={handleSaveUser} className="space-y-4">
-              <div>
-                <label className="mb-1 block text-xs font-medium text-zinc-400">Full Name</label>
-                <input value={name} onChange={(e) => setName(e.target.value)} className="w-full rounded-lg border border-zinc-700 bg-zinc-950 p-2.5 text-white focus:ring-2 focus:ring-blue-600 focus:outline-none" />
-              </div>
-
-              <div>
-                <label className="mb-1 block text-xs font-medium text-zinc-400">Email</label>
-                <input defaultValue={selectedUser.email} disabled className="w-full cursor-not-allowed rounded-lg border border-zinc-800 bg-zinc-950/50 p-2.5 text-zinc-500" />
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="mb-1 block text-xs font-medium text-zinc-400">Role</label>
-                  <select value={role} onChange={(e) => setRole(e.target.value)} className="w-full rounded-lg border border-zinc-700 bg-zinc-950 p-2.5 text-white focus:ring-2 focus:ring-blue-600 focus:outline-none">
-                    <option value={USER}>User</option>
-                    <option value={ADMIN}>Admin</option>
-                  </select>
-                </div>
-                <div>
-                  <label className="mb-1 block text-xs font-medium text-zinc-400">Status</label>
-                  <select defaultValue={selectedUser.status} className="w-full rounded-lg border border-zinc-700 bg-zinc-950 p-2.5 text-white focus:ring-2 focus:ring-blue-600 focus:outline-none">
-                    <option value="active">Active</option>
-                    <option value="banned">Banned</option>
-                  </select>
-                </div>
-              </div>
-
-              <div className="mt-8 flex justify-end gap-3">
-                <button type="button" onClick={closeModal} className="rounded-lg px-4 py-2 text-sm font-medium text-zinc-400 transition-colors hover:bg-zinc-800 hover:text-white">
-                  Cancel
-                </button>
-                <button type="submit" className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-bold text-white transition-colors hover:bg-blue-500">
-                  Save Changes
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
+      {/* 3. Edit User Modal (Simple Overlay) */}
+      {isEditOpen && selectedUser && <EditModal selectedUser={selectedUser} name={name} setName={setName} role={role} setRole={setRole} setIsEditOpen={setIsEditOpen} setSelectedUser={setSelectedUser} />}
     </>
   );
 };
