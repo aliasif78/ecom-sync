@@ -42,6 +42,7 @@ export interface IInventoryLevel {
 }
 
 export interface IProduct extends Document {
+  userId: Schema.Types.ObjectId;
   sku: string;
   name: string;
   price: number;
@@ -77,6 +78,9 @@ interface IProductModel extends Model<IProduct> {
 // ==========================================
 const ProductSchema = new Schema<IProduct>(
   {
+    // 🔒 OWNERSHIP
+    userId: { type: Schema.Types.ObjectId, ref: 'User', required: true, index: true },
+
     // Common
     sku: { type: String, required: true, unique: true, index: true, uppercase: true, trim: true }, // Primary Key - immutable
     name: { type: String, required: true },
@@ -177,7 +181,11 @@ ProductSchema.statics.findByPlatformId = async function (platform: typeof SHOPIF
 // 🏎️ INDEXES - Speed up queries
 // ==========================================
 
-// Done inside the model definition using the 'index' or 'sparse' options
+// We almost ALWAYS search by "User" + "SKU".
+// This index makes that query instant and prevents User A from creating a SKU that User B already has (if you want SKUs to be unique per user).
+ProductSchema.index({ userId: 1, sku: 1 }, { unique: true });
+
+// Others, done inside the model definition using the 'index' or 'sparse' options
 
 // ProductSchema.index({ 'mappings.shopify.variantId': 1 });
 // ProductSchema.index({ 'mappings.amazon.asin': 1 });
