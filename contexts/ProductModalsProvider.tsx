@@ -5,19 +5,21 @@ import { createContext, useContext, useState, ReactNode } from 'react';
 
 // Components
 import SyncStockModal from '@/components/products/modals/SyncStockModal';
-import EditProductModal from '@/components/products/modals/EditProductModal'; // New
+import EditProductModal from '@/components/products/modals/EditProductModal';
 import AddProductModal from '@/components/products/modals/AddProductModal';
+import { ProductHistoryModal } from '@/components/products/modals/HistoryModal'; // 👈 Added Import
 
 // Interfaces
 import { ProductRow } from '@/types';
 
 // Types
-type ModalType = 'SYNC' | 'EDIT' | 'ADD' | null;
+type ModalType = 'SYNC' | 'EDIT' | 'ADD' | 'HISTORY' | null; // 👈 Added HISTORY
 
 interface ProductModalsContextType {
   openSyncModal: (product: ProductRow) => void;
   openEditModal: (product: ProductRow) => void;
-  openAddModal: () => void; // Add doesn't need a product
+  openHistoryModal: (product: ProductRow) => void; // 👈 Added Interface
+  openAddModal: () => void;
   closeModal: () => void;
 }
 
@@ -38,6 +40,7 @@ export function ProductModalsProvider({ children }: { children: ReactNode }) {
 
   const openSyncModal = (product: ProductRow) => openModalHelper('SYNC', product);
   const openEditModal = (product: ProductRow) => openModalHelper('EDIT', product);
+  const openHistoryModal = (product: ProductRow) => openModalHelper('HISTORY', product); // 👈 Added Handler
   const openAddModal = () => openModalHelper('ADD');
 
   const closeModal = () => {
@@ -49,7 +52,7 @@ export function ProductModalsProvider({ children }: { children: ReactNode }) {
   };
 
   return (
-    <ProductModalsContext.Provider value={{ openSyncModal, openEditModal, openAddModal, closeModal }}>
+    <ProductModalsContext.Provider value={{ openSyncModal, openEditModal, openHistoryModal, openAddModal, closeModal }}>
       {children}
 
       {/* --- The Modals Layer --- */}
@@ -60,7 +63,10 @@ export function ProductModalsProvider({ children }: { children: ReactNode }) {
       {/* 2. Edit Modal */}
       {activeModal === 'EDIT' && selectedProduct && <EditProductModal key={selectedProduct._id} isOpen={true} onClose={closeModal} product={selectedProduct} />}
 
-      {/* 3. Add Modal */}
+      {/* 3. History Modal */}
+      {activeModal === 'HISTORY' && selectedProduct && <ProductHistoryModal key={selectedProduct._id} isOpen={true} onClose={closeModal} selectedProduct={selectedProduct} isLoading={false} />}
+
+      {/* 4. Add Modal */}
       {activeModal === 'ADD' && <AddProductModal isOpen={true} onClose={closeModal} />}
     </ProductModalsContext.Provider>
   );
