@@ -11,10 +11,10 @@ export default function Home() {
       {/* Content Layer: UI */}
       <div className="z-10 flex max-w-5xl flex-col items-center gap-6 px-4 text-center">
         {/* Status Badge */}
-        <div className="border-primary/20 bg-primary/10 text-primary inline-flex items-center rounded-full border px-3 py-1 text-sm font-medium backdrop-blur-md">
+        <div className="inline-flex items-center rounded-full border border-white/20 bg-white/10 px-3 py-1 text-sm font-medium text-white backdrop-blur-md">
           <span className="relative mr-2 flex h-2 w-2">
-            <span className="bg-primary absolute inline-flex h-full w-full animate-ping rounded-full opacity-75"></span>
-            <span className="bg-primary relative inline-flex h-2 w-2 rounded-full"></span>
+            <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-white/20 opacity-75"></span>
+            <span className="relative inline-flex h-2 w-2 rounded-full bg-green-500"></span>
           </span>
           System Status: Online
         </div>
@@ -29,7 +29,7 @@ export default function Home() {
 
         {/* Buttons */}
         <div className="mt-8 flex flex-col gap-4 sm:flex-row">
-          <button className="bg-primary hover:bg-primary/90 h-12 rounded-md px-8 font-medium text-white transition-all">Initialize System</button>
+          <button className="h-12 rounded-md bg-white px-8 font-medium text-black transition-all">Initialize System</button>
         </div>
       </div>
     </main>
