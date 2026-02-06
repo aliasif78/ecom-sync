@@ -33,7 +33,7 @@ export async function updateSession(request: NextRequest) {
 
   // 4. Protect Routes
   // If NO user and trying to go to a protected page -> Redirect to Login
-  if (!user && !request.nextUrl.pathname.startsWith('/login')) {
+  if (!user && !request.nextUrl.pathname.startsWith('/login') && request.nextUrl.pathname !== '/') {
     const url = request.nextUrl.clone();
     url.pathname = '/login';
     return NextResponse.redirect(url);
