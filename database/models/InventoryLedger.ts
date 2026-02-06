@@ -13,6 +13,9 @@
 // Dependencies
 import mongoose, { model, models, Schema } from 'mongoose';
 
+// Types
+import { InventoryReason } from '@/types';
+
 // Constants
 import { PLATFORMS } from '@/lib/globalConstants';
 
@@ -26,7 +29,8 @@ import { PLATFORMS } from '@/lib/globalConstants';
 
 interface IInventoryLedger extends Document {
   // Ids
-  product: mongoose.Types.ObjectId;
+  productId: mongoose.Types.ObjectId;
+  userId: mongoose.Types.ObjectId;
   locationId: string;
 
   // Math
@@ -37,6 +41,7 @@ interface IInventoryLedger extends Document {
   // Metadata
   platform: (typeof PLATFORMS)[number];
   reason: string;
+  description: string;
   createdAt: Date;
 }
 
@@ -47,7 +52,8 @@ interface IInventoryLedger extends Document {
 const InventoryLedgerSchema = new Schema<IInventoryLedger>(
   {
     // Ids
-    product: { type: Schema.Types.ObjectId, ref: 'Product', required: true, index: true },
+    productId: { type: Schema.Types.ObjectId, ref: 'Product', required: true, index: true },
+    userId: { type: Schema.Types.ObjectId, ref: 'User', required: true, index: true },
     locationId: { type: String, required: true, index: true },
 
     // The Math
@@ -57,7 +63,8 @@ const InventoryLedgerSchema = new Schema<IInventoryLedger>(
 
     // Metadata
     platform: { type: String, enum: PLATFORMS, required: true, index: true },
-    reason: { type: String, required: true },
+    reason: { type: String, enum: Object.values(InventoryReason), required: true },
+    description: { type: String },
   },
 
   // Enable timestamps

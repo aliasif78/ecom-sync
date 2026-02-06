@@ -40,3 +40,17 @@ export type ProductRow = {
   createdAt?: string; // It comes as a string from the server
   updatedAt?: string;
 };
+
+export enum InventoryReason {
+  // --- USER SELECTABLE (Show in Popup) ---
+  MANUAL_ADJUSTMENT = 'MANUAL_ADJUSTMENT', // "Just fixing the count"
+  DAMAGED_GOODS = 'DAMAGED_GOODS', // "Box fell off the truck"
+  THEFT_OR_LOSS = 'THEFT_OR_LOSS', // "It's gone and I don't know why"
+  RETURN_RESTOCK = 'RETURN_RESTOCK', // "Customer returned item manually"
+  RECEIVED_INVENTORY = 'RECEIVED_INVENTORY', // "New shipment arrived"
+
+  // --- SYSTEM ONLY (Hidden from Popup) ---
+  ORDER_FULFILLMENT = 'ORDER_FULFILLMENT', // Triggered by Shopify/Amazon Order
+  ORDER_CANCELLATION = 'ORDER_CANCELLATION', // Triggered by cancelling an order
+  INITIAL_COUNT = 'INITIAL_COUNT', // Triggered when product is created
+}

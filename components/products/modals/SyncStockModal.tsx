@@ -11,7 +11,7 @@ import { syncProductStock } from '@/actions/inventory';
 import { ModalShell, ModalHeader, ModalInput, ModalSelect, ModalFooter } from './Atoms';
 
 // Types
-import { ProductRow } from '@/types';
+import { ProductRow, InventoryReason } from '@/types';
 
 // Constants
 import { MANUAL } from '@/lib/globalConstants';
@@ -21,8 +21,9 @@ export default function SyncStockModal({ isOpen, onClose, product }: { isOpen: b
   // ✅ Initialize state directly from the prop
   // Because we add a 'key' in the parent, this line runs fresh every time a new product is selected.
   const [newStock, setNewStock] = useState(product?.stock.toString() || '');
-  const [reason, setReason] = useState('Manual Adjustment');
+  const [reason, setReason] = useState<InventoryReason>(InventoryReason.MANUAL_ADJUSTMENT);
   const [isLoading, setIsLoading] = useState(false);
+  const [description, setDescription] = useState('');
 
   // Functions
   const handleSync = async () => {
@@ -41,7 +42,7 @@ export default function SyncStockModal({ isOpen, onClose, product }: { isOpen: b
     setIsLoading(true);
 
     try {
-      const res = await syncProductStock(product._id, Number(newStock), reason, MANUAL);
+      const res = await syncProductStock(product._id, Number(newStock), reason, MANUAL, description);
 
       // Error
       if (!res.success || res.error) {
@@ -74,18 +75,23 @@ export default function SyncStockModal({ isOpen, onClose, product }: { isOpen: b
       />
 
       <div className="space-y-4">
-        <ModalInput label="New Quantity" type="number" value={newStock} onChange={(e) => setNewStock(e.target.value)} suffix="units" />
+        <ModalInput label="New Quantity" type="number" value={newStock} onChange={(e) => setNewStock(e.target.value)} required suffix="units" />
 
         <ModalSelect
           label="Reason"
           value={reason}
-          onChange={(e) => setReason(e.target.value)}
+          onChange={(e) => setReason(e.target.value as InventoryReason)}
+          required
           options={[
-            { value: 'Manual Adjustment', label: 'Manual Adjustment' },
-            { value: 'Stock Audit', label: 'Stock Audit' },
-            { value: 'Damaged Goods', label: 'Damaged Goods' },
+            { value: InventoryReason.MANUAL_ADJUSTMENT, label: 'Manual Adjustment' },
+            { value: InventoryReason.RETURN_RESTOCK, label: 'Return Restock' },
+            { value: InventoryReason.DAMAGED_GOODS, label: 'Damaged Goods' },
+            { value: InventoryReason.THEFT_OR_LOSS, label: 'Theft or Loss' },
+            { value: InventoryReason.RECEIVED_INVENTORY, label: 'Received Inventory' },
           ]}
         />
+
+        <ModalInput label="Description" type="text" value={description} onChange={(e) => setDescription(e.target.value)} />
       </div>
 
       <ModalFooter onCancel={onClose} onConfirm={handleSync} isLoading={isLoading} confirmText="Confirm Sync" />

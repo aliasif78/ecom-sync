@@ -14,6 +14,7 @@ async function runProtectedAction(tag: string, fn: (userId: string) => Promise<{
   try {
     // 1. Centralized Auth
     const { success, user, message } = await getCurrentUser();
+
     if (!success || !user) {
       console.error(`🚩 ${tag}_ERROR: User not found`);
       return { success: false, message: message || 'Unauthorized' };
