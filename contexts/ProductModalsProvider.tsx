@@ -64,7 +64,7 @@ export function ProductModalsProvider({ children }: { children: ReactNode }) {
       {activeModal === 'EDIT' && selectedProduct && <EditProductModal key={selectedProduct._id} isOpen={true} onClose={closeModal} product={selectedProduct} />}
 
       {/* 3. History Modal */}
-      {activeModal === 'HISTORY' && selectedProduct && <ProductHistoryModal key={selectedProduct._id} isOpen={true} onClose={closeModal} selectedProduct={selectedProduct} isLoading={false} />}
+      {activeModal === 'HISTORY' && selectedProduct && <ProductHistoryModal key={selectedProduct._id} isOpen={true} onClose={closeModal} selectedProduct={selectedProduct} />}
 
       {/* 4. Add Modal */}
       {activeModal === 'ADD' && <AddProductModal isOpen={true} onClose={closeModal} />}

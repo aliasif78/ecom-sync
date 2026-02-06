@@ -1,6 +1,20 @@
+// React
+import { useState, useEffect } from 'react';
+
+// Dependencies
 import { format } from 'date-fns';
+
+// Components
 import { ModalShell, ModalHeader } from './Atoms';
+
+// Types
 import { InventoryReason, ProductRow } from '@/types';
+
+// Actions
+import { getProductHistory } from '@/actions/inventory';
+
+// Shadcn
+import { toast } from 'sonner';
 
 // ---------------------------------------------------------
 // 1. Types for the Props
@@ -11,17 +25,13 @@ interface HistoryEntry {
   change: number; // e.g. +5 or -2
   newStock: number; // The stock snapshot after change
   createdAt: string; // ISO Date
-  user?: {
-    firstName: string;
-    lastName: string;
-  };
+  userName: string;
 }
 
 interface ProductHistoryModalProps {
   isOpen: boolean;
   onClose: () => void;
   selectedProduct: ProductRow;
-  isLoading: boolean;
 }
 
 // ---------------------------------------------------------
@@ -59,10 +69,27 @@ const getReasonBadge = (reason: string) => {
 // ---------------------------------------------------------
 // 3. The Component
 // ---------------------------------------------------------
-export const ProductHistoryModal = ({ isOpen, onClose, selectedProduct, isLoading }: ProductHistoryModalProps) => {
-  const history: HistoryEntry[] = [];
+export const ProductHistoryModal = ({ isOpen, onClose, selectedProduct }: ProductHistoryModalProps) => {
+  // States
+  const [history, setHistory] = useState<HistoryEntry[]>([]);
+  const [isLoading, setIsLoading] = useState(false);
 
-  // Custom Empty State
+  // Effects
+  useEffect(() => {
+    const fetchHistory = async () => {
+      setIsLoading(true);
+
+      const res = await getProductHistory(selectedProduct._id);
+      if (res.success && res.data) setHistory(res.data);
+      else toast.error(res.message);
+
+      setIsLoading(false);
+    };
+
+    fetchHistory();
+  }, [selectedProduct._id]);
+
+  // Rendering Constants
   const isEmpty = !isLoading && history.length === 0;
 
   return (
@@ -109,12 +136,10 @@ export const ProductHistoryModal = ({ isOpen, onClose, selectedProduct, isLoadin
                       <div>{getReasonBadge(entry.reason)}</div>
                       <div className="flex items-center gap-2 text-xs text-slate-500">
                         <span>{format(dateObj, 'MMM d, yyyy • h:mm a')}</span>
-                        {entry.user && (
+                        {entry.userName && (
                           <>
                             <span className="h-1 w-1 rounded-full bg-slate-700"></span>
-                            <span>
-                              {entry.user.firstName} {entry.user.lastName}
-                            </span>
+                            <span>{entry.userName}</span>
                           </>
                         )}
                       </div>

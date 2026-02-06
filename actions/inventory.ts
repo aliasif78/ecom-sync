@@ -89,3 +89,43 @@ export const syncProductStock = async (productId: string, newStock: number, reas
     if (session) session.endSession();
   }
 };
+
+export const getProductHistory = async (productId: string) => {
+  try {
+    // 1. Get the current user
+    const { success, user, message } = await getCurrentUser();
+
+    if (!success || !user) {
+      console.error(`🚩 GET_PRODUCT_HISTORY_ERROR: User not found`);
+      return { success: false, message: message || 'Unauthorized' };
+    }
+
+    // 2. Connect to the database
+    await connectDB();
+
+    // 3. Get the product history
+    let history = await InventoryLedger.find({ productId, userId: user._id })
+      .sort({ createdAt: -1 })
+      .populate('userId', 'name') // 👈 Join User table, get only names
+      .lean(); // 👈 Convert to plain JS objects immediately
+
+    if (!history || !history.length) return { success: false, error: 'Product history not found' };
+
+    // 4. Map to plain objects and sanitize IDs
+    history = history.map((entry) => ({
+      ...entry,
+      _id: entry._id.toString(),
+      userId: entry.userId.toString(),
+      productId: entry.productId.toString(),
+      locationId: entry.locationId.toString(),
+      userName: entry.userId.name,
+      createdAt: entry.createdAt.toISOString(),
+    }));
+
+    // 5. Return success
+    return { success: true, data: history };
+  } catch (error) {
+    console.error('🚩 GET_PRODUCT_HISTORY_ERROR:', error);
+    return { success: false, error: 'Failed to get product history' };
+  }
+};
