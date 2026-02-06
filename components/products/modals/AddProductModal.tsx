@@ -5,7 +5,7 @@ import { useState } from 'react';
 import { toast } from 'sonner';
 
 // Server Actions
-// import { createProduct } from '@/actions/products'; // You need to create this action
+import { addProduct } from '@/actions/products';
 
 // Components
 import { ModalShell, ModalHeader, ModalInput, ModalFooter } from './Atoms';
@@ -21,16 +21,21 @@ export default function AddProductModal({ isOpen, onClose }: { isOpen: boolean; 
   const handleSubmit = async () => {
     if (!form.name || !form.sku || !form.price) return toast.error('Please fill required fields');
 
-    // setIsLoading(true);
-    // const res = await createProduct(form); // Server Action
-    // setIsLoading(false);
+    setIsLoading(true);
+    const res = await addProduct({ ...form, price: Number(form.price), stock: Number(form.stock) });
+    setIsLoading(false);
 
-    // if (res.success) {
-    //   toast.success('Product created!');
-    //   onClose();
-    // } else {
-    //   toast.error(res.message);
-    // }
+    // Success
+    if (res.success) {
+      toast.success('Product created!');
+      onClose();
+    }
+
+    // Error
+    else {
+      console.error(res.message);
+      toast.error(res.message);
+    }
   };
 
   return (

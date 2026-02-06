@@ -1,5 +1,5 @@
 // Providers
-import { ProductModalsProvider } from '@/contexts/SyncModalProvider';
+import { ProductModalsProvider } from '@/contexts/ProductModalsProvider';
 
 export default function ProductsLayout({ children }: { children: React.ReactNode }) {
   return (

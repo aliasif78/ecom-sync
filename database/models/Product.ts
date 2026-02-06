@@ -37,6 +37,7 @@ export const SYNC_STATUS = { IDLE, SYNCING, FAILED } as const;
 // 🚓 INTERFACES
 // ==========================================
 export interface IInventoryLevel {
+  _id?: Types.ObjectId;
   locationId: string;
   quantity: number;
 }

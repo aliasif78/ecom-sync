@@ -4,7 +4,7 @@
 import Image from 'next/image';
 
 // Contexts
-import { useProductModals } from '@/contexts/SyncModalProvider';
+import { useProductModals } from '@/contexts/ProductModalsProvider';
 
 // Types
 import { ProductRow } from '@/types';
@@ -71,7 +71,8 @@ const ProductTable = ({ products }: Props) => {
                   <td className="px-8 py-5 whitespace-nowrap">
                     <div className="flex items-center gap-4">
                       <div className="relative h-14 w-14 shrink-0 overflow-hidden rounded-xl border border-white/10 bg-slate-800">
-                        <Image src={product.image} alt={product.name} fill className="object-cover" sizes="56px" />
+                        {/* <Image src={product.image} alt={product.name} fill className="object-cover" sizes="56px" /> */}
+                        <img src={product.image} alt={product.name} className="h-10 w-10 rounded object-cover" />
                       </div>
 
                       <div>
