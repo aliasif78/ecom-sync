@@ -98,6 +98,11 @@ export async function updateProductById({ userId, _id, name, price, image }: { u
       return { success: false, message: 'Missing required fields' };
     }
 
+    if (price !== undefined && price < 0) {
+      console.error('🚩 UPDATE_PRODUCT_ERROR: Price cannot be negative');
+      return { success: false, message: 'Price cannot be negative' };
+    }
+
     // 2. Connect to the DB
     await connectDB();
 

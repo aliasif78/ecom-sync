@@ -34,7 +34,7 @@ const getStockStatus = (stock: number) => {
 // ==========================================
 const ProductTable = ({ products }: Props) => {
   // Contexts
-  const { openSyncModal } = useProductModals();
+  const { openSyncModal, openEditModal } = useProductModals();
 
   return (
     <div className="w-full overflow-hidden rounded-2xl border border-white/10 bg-slate-900 shadow-2xl backdrop-blur-xl">
@@ -102,7 +102,7 @@ const ProductTable = ({ products }: Props) => {
                   <td className="px-8 py-5 text-right text-sm font-medium whitespace-nowrap">
                     <div className="flex items-center justify-end gap-3">
                       {/* 1. Edit Button (Ghost Style) */}
-                      <button type="button" className="group/edit relative flex h-10 w-10 items-center justify-center rounded-lg border border-transparent text-slate-400 transition-all hover:border-indigo-500/30 hover:bg-indigo-500/10 hover:text-indigo-400" title="Edit Product">
+                      <button type="button" onClick={() => openEditModal(product)} className="group/edit relative flex h-10 w-10 items-center justify-center rounded-lg border border-transparent text-slate-400 transition-all hover:border-indigo-500/30 hover:bg-indigo-500/10 hover:text-indigo-400" title="Edit Product">
                         <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
                         </svg>
