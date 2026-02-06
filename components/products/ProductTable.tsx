@@ -8,6 +8,7 @@ import { useProductModals } from '@/contexts/ProductModalsProvider';
 
 // Types
 import { ProductRow } from '@/types';
+import { deleteProduct } from '@/actions/products';
 
 // Interfaces
 // Define the shape of the data strictly for the Frontend
@@ -35,6 +36,11 @@ const getStockStatus = (stock: number) => {
 const ProductTable = ({ products }: Props) => {
   // Contexts
   const { openSyncModal, openEditModal } = useProductModals();
+
+  // Functions
+  const handleDelete = async (id: string) => {
+    if (confirm('Are you sure that you want to delete this product?')) await deleteProduct(id);
+  };
 
   return (
     <div className="w-full overflow-hidden rounded-2xl border border-white/10 bg-slate-900 shadow-2xl backdrop-blur-xl">
@@ -109,7 +115,7 @@ const ProductTable = ({ products }: Props) => {
                       </button>
 
                       {/* 2. Delete Button (Danger Ghost Style) */}
-                      <button type="button" className="group/delete relative flex h-10 w-10 items-center justify-center rounded-lg border border-transparent text-slate-400 transition-all hover:border-red-500/30 hover:bg-red-500/10 hover:text-red-400" title="Delete Product">
+                      <button type="button" onClick={() => handleDelete(product._id)} className="group/delete relative flex h-10 w-10 items-center justify-center rounded-lg border border-transparent text-slate-400 transition-all hover:border-red-500/30 hover:bg-red-500/10 hover:text-red-400" title="Delete Product">
                         <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
                         </svg>
