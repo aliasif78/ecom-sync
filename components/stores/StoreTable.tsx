@@ -7,6 +7,9 @@ import { ActionButton, Icons } from '@/components/shared/TableActions';
 // Types
 import { StoreRow } from '@/types/index';
 
+// Contexts
+import { useStoreModals } from '@/contexts/StoreModalsProvider';
+
 // Interfaces
 interface Props {
   stores: StoreRow[];
@@ -32,8 +35,7 @@ const getPlatformStyle = (platform: string) => {
 };
 
 const StoreTable = ({ stores }: Props) => {
-  // TODO: Add Store Modal Hooks here later
-  // const { openEditStoreModal } = useStoreModals();
+  const { openEditStoreModal } = useStoreModals();
 
   const handleDelete = async (id: string) => {
     if (confirm('Are you sure you want to disconnect this store? Synchronization will stop immediately.')) {
@@ -43,7 +45,7 @@ const StoreTable = ({ stores }: Props) => {
   };
 
   const handleEdit = (store: StoreRow) => {
-    console.log('Editing store:', store);
+    openEditStoreModal(store);
   };
 
   return (
