@@ -83,3 +83,25 @@ export async function addStore(params: AddStoreParams) {
     return { success: false, message: 'Failed to add store.' };
   }
 }
+
+export async function getStoresByUserId({ userId }: { userId: string }) {
+  try {
+    // 1. Connect to DB
+    await connectDB();
+
+    // 2. Fetch stores
+    const stores = await Store.find({ userId: new Types.ObjectId(userId) })
+      .select('-config')
+      .sort({ createdAt: -1 })
+      .lean();
+
+    // 3. Return stores
+    // Next.js Serialization Fix:
+    // Mongoose IDs are objects. Convert to string to avoid "Client Component" warnings.
+    const sanitizedStores = JSON.parse(JSON.stringify(stores));
+    return { success: true, message: 'Stores fetched successfully!', stores: sanitizedStores };
+  } catch (error) {
+    console.error('🚩 GET_STORES_ERROR:', error);
+    return { success: false, message: 'Failed to fetch stores.' };
+  }
+}
