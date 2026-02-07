@@ -105,3 +105,20 @@ export async function getStoresByUserId({ userId }: { userId: string }) {
     return { success: false, message: 'Failed to fetch stores.' };
   }
 }
+
+export async function deleteStoreById({ storeId, userId }: { storeId: string; userId: string }) {
+  try {
+    // 1. Connect to DB
+    await connectDB();
+
+    // 2. Delete store
+    const result = await Store.deleteOne({ _id: new Types.ObjectId(storeId), userId: new Types.ObjectId(userId) });
+    if (!result.deletedCount) return { success: false, message: 'Store not found or access denied.' };
+
+    // 3. Return success
+    return { success: true, message: 'Store deleted successfully!' };
+  } catch (error) {
+    console.error('🚩 DELETE_STORE_ERROR:', error);
+    return { success: false, message: 'Failed to delete store.' };
+  }
+}

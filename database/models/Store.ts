@@ -42,6 +42,7 @@ interface IStore extends Document {
   // Timestamps
   createdAt: Date;
   updatedAt: Date;
+  lastSyncAt: Date | null;
 }
 
 // ==========================================
@@ -62,6 +63,7 @@ const StoreSchema = new Schema<IStore>(
     // Status
     isConnected: { type: Boolean, default: false },
     isSyncEnabled: { type: Boolean, default: true },
+    lastSyncAt: { type: Date, default: null },
   },
 
   { timestamps: true, toJSON: { virtuals: true }, toObject: { virtuals: true } }

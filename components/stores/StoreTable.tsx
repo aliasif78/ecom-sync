@@ -10,6 +10,10 @@ import { StoreRow } from '@/types/index';
 // Contexts
 import { useStoreModals } from '@/contexts/StoreModalsProvider';
 
+// BE Functions
+import { deleteStoreByIdAction } from '@/actions/stores';
+import { toast } from 'sonner';
+
 // Interfaces
 interface Props {
   stores: StoreRow[];
@@ -39,8 +43,15 @@ const StoreTable = ({ stores }: Props) => {
 
   const handleDelete = async (id: string) => {
     if (confirm('Are you sure you want to disconnect this store? Synchronization will stop immediately.')) {
-      // await deleteStore(id);
-      console.log('Deleting store:', id);
+      const res = await deleteStoreByIdAction(id);
+
+      // Success
+      if (res.success) toast.success(res.message);
+      // Error
+      else {
+        console.error(res.message);
+        toast.error(res.message);
+      }
     }
   };
 
