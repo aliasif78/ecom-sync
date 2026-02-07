@@ -4,7 +4,7 @@ import React, { ReactNode } from 'react';
 export const ModalShell = ({ children, isOpen }: { children: ReactNode; isOpen: boolean }) => {
   if (!isOpen) return null;
   return (
-    <div className="animate-in fade-in zoom-in-95 fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 backdrop-blur-sm transition-all duration-300">
+    <div className="animate-in fade-in zoom-in-95 fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 backdrop-blur-xs transition-all duration-300">
       <div className="w-full max-w-md transform overflow-hidden rounded-2xl border border-white/10 bg-slate-900 p-6 shadow-2xl transition-all duration-300">{children}</div>
     </div>
   );
@@ -87,6 +87,20 @@ export const ModalFooter = ({ onCancel, onConfirm, isLoading, confirmText = 'Con
       ) : (
         confirmText
       )}
+    </button>
+  </div>
+);
+
+// --- New Atom: Toggle Switch ---
+export const ModalToggle = ({ label, checked, onChange, description }: { label: string; checked: boolean; onChange: (checked: boolean) => void; description?: string }) => (
+  <div className="flex items-center justify-between rounded-lg border border-slate-800 bg-slate-900/50 p-4">
+    <div>
+      <span className="block text-sm font-semibold text-white">{label}</span>
+      {description && <span className="mt-1 block text-xs text-slate-400">{description}</span>}
+    </div>
+
+    <button onClick={() => onChange(!checked)} type="button" className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${checked ? 'bg-indigo-600' : 'bg-slate-700'}`}>
+      <span aria-hidden="true" className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${checked ? 'translate-x-5' : 'translate-x-0'}`} />
     </button>
   </div>
 );

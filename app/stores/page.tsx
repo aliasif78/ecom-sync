@@ -11,8 +11,8 @@ const Page = async () => {
   //  Dummy stores
   const stores: StoreRow[] = [
     { _id: '1', name: 'Store 1', platform: 'SHOPIFY', isConnected: true, isSyncEnabled: true, lastSyncAt: '2022-01-01' },
-    { _id: '2', name: 'Store 2', platform: 'AMAZON', isConnected: true, isSyncEnabled: true, lastSyncAt: '2022-01-01' },
-    { _id: '3', name: 'Store 3', platform: 'WOOCOMMERCE', isConnected: true, isSyncEnabled: true, lastSyncAt: '2022-01-01' },
+    { _id: '2', name: 'Store 2', platform: 'AMAZON', isConnected: false, isSyncEnabled: true, lastSyncAt: '2022-01-01' },
+    { _id: '3', name: 'Store 3', platform: 'WOOCOMMERCE', isConnected: true, isSyncEnabled: false, lastSyncAt: '2022-01-01' },
   ];
 
   return (
