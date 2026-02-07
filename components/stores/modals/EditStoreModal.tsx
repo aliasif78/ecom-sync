@@ -74,7 +74,7 @@ export const EditStoreModal = ({ isOpen, onClose, store }: { isOpen: boolean; on
         <div className="space-y-4">
           <ModalInput label="Store Nickname" value={name} onChange={(e) => setName(e.target.value)} />
 
-          <ModalToggle label="Automatic Synchronization" description="If disabled, stock updates will not be pushed to this store." checked={isSyncEnabled} onChange={setIsSyncEnabled} />
+          <ModalToggle label="Automatic Synchronization" description="If disabled, stock updates won't be pushed to this store." checked={isSyncEnabled} onChange={setIsSyncEnabled} />
         </div>
 
         {/* 3. Credential Rotation (Collapsible-ish) */}

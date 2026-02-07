@@ -1,3 +1,5 @@
+'use server';
+
 // Database
 import { EPlatform } from '@/lib/globalConstants';
 
@@ -9,6 +11,7 @@ export async function addStoreAction(data: { name: string; platform: EPlatform; 
   // 1. Input Validation
   const { name, platform, config, isSyncEnabled } = data;
   if (!name || !platform || !config || isSyncEnabled === undefined) return { success: false, message: 'Missing required fields' };
+  console.log(config);
 
   // 2. Run the BE function
   return authGuard('ADD_STORE', '/stores', (userId) => addStore({ userId, ...data }));

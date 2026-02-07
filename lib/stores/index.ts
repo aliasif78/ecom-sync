@@ -1,5 +1,3 @@
-'use server';
-
 // Dependencies
 import { z } from 'zod';
 import { Types } from 'mongoose';
