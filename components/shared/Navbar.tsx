@@ -8,7 +8,7 @@ import { usePathname } from 'next/navigation';
 import { User } from '@supabase/supabase-js';
 
 // Components
-import LogoutButton from './auth/LogoutButton';
+import LogoutButton from '../auth/LogoutButton';
 
 // Interfaces
 interface NavbarProps {

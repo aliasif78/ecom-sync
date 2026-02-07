@@ -9,7 +9,7 @@ import { Toaster } from 'sonner';
 import { createClient } from '@/lib/supabase/server';
 
 // Components
-import Navbar from '@/components/Navbar';
+import Navbar from '@/components/shared/Navbar';
 
 // Styles
 import './globals.css';
