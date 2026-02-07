@@ -5,7 +5,9 @@ import { revalidatePath } from 'next/cache';
 import { getCurrentUser } from './users';
 
 // --- Types ---
-type ActionResponse<T> = { success: boolean; message: string; data?: T };
+// 🟢 NEW: Flexible. Allows any keys you want.
+// We use 'Partial<T>' so that when errors happen, we don't need to return empty data.
+export type ActionResponse<T = unknown> = { success: boolean; message: string } & Partial<T>;
 
 /**
  * A standardized wrapper for all Server Actions.
@@ -22,7 +24,7 @@ export async function authGuard<T>(
 
     if (!success || !user) {
       console.error(`🚩 ${tag}_AUTH_ERROR: User not found`);
-      return { success: false, message: message || 'Unauthorized' };
+      return { success: false, message: message || 'Unauthorized' } as ActionResponse<T>;
     }
 
     // 2. Execute Business Logic (Inject User ID)
@@ -43,6 +45,6 @@ export async function authGuard<T>(
   } catch (error) {
     // 5. Catch Unexpected Crashes (e.g. DB connection died)
     console.error(`🚩 ${tag}_CRITICAL_ERROR:`, error);
-    return { success: false, message: `System Error: Failed to execute ${tag}` };
+    return { success: false, message: `System Error: Failed to execute ${tag}` } as ActionResponse<T>;
   }
 }
