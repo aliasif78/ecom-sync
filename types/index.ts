@@ -54,3 +54,12 @@ export enum InventoryReason {
   ORDER_CANCELLATION = 'ORDER_CANCELLATION', // Triggered by cancelling an order
   INITIAL_COUNT = 'INITIAL_COUNT', // Triggered when product is created
 }
+
+export interface StoreRow {
+  _id: string;
+  name: string;
+  platform: 'SHOPIFY' | 'AMAZON' | 'WOOCOMMERCE';
+  isConnected: boolean;
+  isSyncEnabled: boolean;
+  lastSyncAt?: string;
+}
