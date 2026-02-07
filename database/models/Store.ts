@@ -28,6 +28,7 @@ interface IStore extends Document {
   userId: Types.ObjectId;
   platform: EPlatform;
   name: string;
+  storeUrl: string;
 
   // Flexible config object to handle different platforms
   // ⚠️ We use 'any' or 'Record<string, any>' here because the shape changes
@@ -53,6 +54,7 @@ const StoreSchema = new Schema<IStore>(
     userId: { type: Types.ObjectId, ref: 'User', required: true, index: true },
     platform: { type: String, enum: Object.values(EPlatform), required: true },
     name: { type: String, required: true },
+    storeUrl: { type: String, required: true, unique: true },
 
     // Config
     config: { select: false, type: Schema.Types.Mixed, default: {} },

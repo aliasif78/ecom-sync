@@ -6,6 +6,9 @@ import { Types } from 'mongoose';
 // Constants
 import { DEF_LOC_ID } from '../globalConstants';
 
+// Utils
+import { isDuplicateError } from '../utils';
+
 // GET Products
 // This exists here, only because the component using it is a server component
 // If it were a client component, we would use server actions
@@ -83,7 +86,7 @@ export async function addProductByUserId({ userId, name, price, image, sku, stoc
     console.error('🚩 ADD_PRODUCT_ERROR:', error);
 
     // 1. Check for Duplicate Key Error (Mongoose Error Code 11000)
-    if (error && typeof error === 'object' && 'code' in error && (error as { code: number }).code === 11000) return { success: false, message: 'This SKU already exists. Please use a unique SKU.' };
+    if (isDuplicateError(error)) return { success: false, message: 'This SKU already exists. Please use a unique SKU.' };
 
     // 2. Generic Error
     return { success: false, message: 'Failed to add product' };

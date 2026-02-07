@@ -17,3 +17,13 @@ export const formatDate = (dateString: string): string => {
   const date = new Date(dateString);
   return date.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
 };
+
+export const isDuplicateError = (error: unknown): boolean => {
+  if (error && typeof error === 'object' && 'code' in error && (error as { code: number }).code === 11000) return true;
+  return false;
+};
+
+export const getKeyPattern = (error: unknown) => {
+  if (typeof error === 'object' && error && 'keyPattern' in error) return (error as { keyPattern: { storeUrl?: string; name?: string } }).keyPattern;
+  return null;
+};
