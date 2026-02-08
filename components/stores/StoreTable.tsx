@@ -75,7 +75,7 @@ const StoreTable = ({ stores }: Props) => {
                 </div>
                 <div>
                   <div className="text-base font-semibold text-slate-100">{store.name}</div>
-                  <div className="mt-1 font-mono text-xs tracking-wider text-slate-500 uppercase">ID: {store._id.slice(-6)}</div>
+                  <div className="mt-1 font-mono text-xs tracking-wider text-slate-500 uppercase">ID: ...{store._id.slice(-6)}</div>
                 </div>
               </div>
             </td>

@@ -63,3 +63,21 @@ export interface StoreRow {
   isSyncEnabled: boolean;
   lastSyncAt?: string;
 }
+
+export interface StoreFormState {
+  // Common
+  name?: string;
+  isSyncEnabled?: boolean;
+
+  // Shopify
+  shopUrl?: string;
+  accessToken?: string;
+
+  // Amazon
+  apiKey?: string;
+  endpoint?: string;
+
+  // WooCommerce
+  consumerKey?: string;
+  consumerSecret?: string;
+}

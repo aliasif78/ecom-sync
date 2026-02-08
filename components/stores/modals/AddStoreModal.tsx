@@ -5,13 +5,17 @@ import { useState } from 'react';
 
 // Components
 import { ModalShell, ModalHeader, ModalInput, ModalSelect, ModalFooter, ModalToggle } from '@/components/products/modals/Atoms';
-import { toast } from 'sonner'; // Assuming you use Sonner or similar
+import { PlatformFields } from '@/components/products/modals/PlatformFields';
+
+// Shadcn
+import { toast } from 'sonner';
 
 // Server Actions
 import { addStoreAction } from '@/actions/stores';
 
 // Constants
 import { EPlatform } from '@/lib/globalConstants';
+import Divider from '@/components/products/modals/Divider';
 
 // Types
 const PLATFORM_OPTIONS = [
@@ -62,78 +66,22 @@ export const AddStoreModal = ({ isOpen, onClose }: { isOpen: boolean; onClose: (
     }
   };
 
-  // --- Render Platform Specific Fields ---
-  const renderPlatformFields = () => {
-    switch (platform) {
-      case EPlatform.SHOPIFY:
-        return (
-          <>
-            <ModalInput label="Shopify Store Domain" placeholder="e.g. my-brand.myshopify.com" value={formData.shopUrl} onChange={(e) => handleChange('shopUrl', e.target.value)} className="font-mono text-sm" />
-            <ModalInput label="Access Token" placeholder="shpat_xxxxxxxxxxxxxxxx" value={formData.accessToken} onChange={(e) => handleChange('accessToken', e.target.value)} className="font-mono text-sm" />
-          </>
-        );
-
-      case EPlatform.AMAZON:
-        return (
-          <>
-            <ModalInput label="Mock API Key" placeholder="AMZN-MOCK-KEY-..." value={formData.apiKey} onChange={(e) => handleChange('apiKey', e.target.value)} className="font-mono text-sm" />
-            <ModalSelect
-              label="Marketplace Region"
-              value={formData.endpoint}
-              onChange={(e) => handleChange('endpoint', e.target.value)}
-              options={[
-                { value: 'US', label: 'North America (US/CA/MX)' },
-                { value: 'EU', label: 'Europe (UK/DE/FR)' },
-              ]}
-            />
-          </>
-        );
-
-      case EPlatform.WOOCOMMERCE:
-        return (
-          <>
-            <ModalInput label="Shopify Store Domain" placeholder="e.g. my-brand.myshopify.com" value={formData.shopUrl} onChange={(e) => handleChange('shopUrl', e.target.value)} className="font-mono text-sm" />
-
-            <div className="flex gap-3">
-              <div className="flex-1">
-                <ModalInput label="Consumer Key" placeholder="ck_xxxx..." value={formData.consumerKey} onChange={(e) => handleChange('consumerKey', e.target.value)} className="font-mono text-sm" />
-              </div>
-
-              <div className="flex-1">
-                <ModalInput label="Consumer Secret" placeholder="cs_xxxx..." value={formData.consumerSecret} onChange={(e) => handleChange('consumerSecret', e.target.value)} className="font-mono text-sm" />
-              </div>
-            </div>
-          </>
-        );
-
-      default:
-        return null;
-    }
-  };
-
   return (
     <ModalShell isOpen={isOpen}>
-      <ModalHeader title="Connect New Store" description="Link an external sales channel to sync inventory." onClose={onClose} />
+      <ModalHeader title="Connect New Store" description="Link an external sales channel." onClose={onClose} />
 
       <div className="flex flex-col gap-5">
         {/* Common Fields */}
         <ModalInput label="Store Nickname" placeholder="e.g. Main US Store" value={formData.name} onChange={(e) => handleChange('name', e.target.value)} autoFocus />
         <ModalSelect label="Platform" value={platform} onChange={(e) => setPlatform(e.target.value as EPlatform)} options={PLATFORM_OPTIONS} />
-        <ModalToggle label="Automatic Synchronization" description="If disabled, stock updates won't be pushed to this store." checked={formData.isSyncEnabled} onChange={(checked) => handleChange('isSyncEnabled', checked)} />
+        <ModalToggle label="Automatic Synchronization" description="Push stock updates to this store." checked={formData.isSyncEnabled} onChange={(c) => handleChange('isSyncEnabled', c)} />
 
-        {/* Divider */}
-        <div className="relative my-1">
-          <div className="absolute inset-0 flex items-center" aria-hidden="true">
-            <div className="w-full border-t border-slate-800"></div>
-          </div>
-
-          <div className="relative flex justify-center">
-            <span className="bg-slate-900 px-2 text-xs font-medium tracking-widest text-slate-500 uppercase">Credentials</span>
-          </div>
-        </div>
+        <Divider title="Credentials" />
 
         {/* Dynamic Fields */}
-        <div className="animate-in fade-in slide-in-from-bottom-2 flex flex-col gap-4 duration-300">{renderPlatformFields()}</div>
+        <div className="animate-in fade-in slide-in-from-bottom-2 flex flex-col gap-4 duration-300">
+          <PlatformFields mode="create" platform={platform} data={formData} onChange={handleChange} />
+        </div>
       </div>
 
       <ModalFooter onCancel={onClose} onConfirm={handleSubmit} isLoading={isLoading} confirmText="Connect Store" />
