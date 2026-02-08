@@ -1,6 +1,7 @@
 // Constants
 import { VERIFICATION, ROLES } from '@/lib/globalConstants';
 
+// Types
 export type LoginFormValues = {
   email: string;
   password: string;
@@ -55,6 +56,7 @@ export enum InventoryReason {
   INITIAL_COUNT = 'INITIAL_COUNT', // Triggered when product is created
 }
 
+// Interfaces
 export interface StoreRow {
   _id: string;
   name: string;
@@ -81,4 +83,10 @@ export interface StoreFormState {
   // WooCommerce
   consumerKey?: string;
   consumerSecret?: string;
+}
+
+export interface InventoryAdapter {
+  validateConnection(): Promise<{ success: true } | { success: false; message: string }>;
+  getProduct(sku: string): Promise<{ sku: string; stock: number; platformId: string } | null>;
+  updateStock(sku: string, newStock: number): Promise<{ success: boolean; message: string }>;
 }
