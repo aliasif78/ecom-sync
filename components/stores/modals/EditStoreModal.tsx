@@ -6,13 +6,13 @@ import { useState } from 'react';
 // Components
 import { ModalShell, ModalHeader, ModalInput, ModalFooter, ModalToggle } from '@/components/products/modals/Atoms';
 import { PlatformFields } from '@/components/products/modals/PlatformFields';
+import Divider from '@/components/products/modals/Divider';
 
 // Types
 import { StoreRow } from '@/types';
 
 // Constants
 import { EPlatform } from '@/lib/globalConstants';
-import Divider from '@/components/products/modals/Divider';
 
 export const EditStoreModal = ({ isOpen, onClose, store }: { isOpen: boolean; onClose: () => void; store: StoreRow }) => {
   // States

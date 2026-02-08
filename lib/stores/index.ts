@@ -78,7 +78,7 @@ export async function getStoresByUserId({ userId }: { userId: string }) {
 
     // 2. Fetch stores
     const stores = await Store.find({ userId: new Types.ObjectId(userId) })
-      .select('+config')
+      .select('-config')
       .sort({ createdAt: -1 })
       .lean();
 
@@ -107,5 +107,55 @@ export async function deleteStoreById({ storeId, userId }: { storeId: string; us
   } catch (error) {
     console.error('🚩 DELETE_STORE_ERROR:', error);
     return { success: false, message: 'Failed to delete store.' };
+  }
+}
+
+export async function editStoreById({ storeId, userId, name, config, isSyncEnabled }: { storeId: string; userId: string; name?: string; config?: Record<string, unknown>; isSyncEnabled?: boolean }) {
+  try {
+    // 1. Basic Validation
+    if (!storeId || !userId || (!name && !config && isSyncEnabled === undefined)) return { success: false, message: 'Missing required fields: storeId, userId, name, config, or isSyncEnabled.' };
+
+    // 2. Connect to DB
+    await connectDB();
+
+    // 3. Get the store
+    const store = await Store.findOne({ _id: new Types.ObjectId(storeId), userId: new Types.ObjectId(userId) }).select('-config');
+    if (!store) return { success: false, message: 'Store not found or access denied.' };
+
+    // 4. Validate the config fields
+    if (config) {
+      let configValidation;
+
+      if (store.platform === EPlatform.SHOPIFY) configValidation = ShopifyConfigSchema.partial().safeParse(config);
+      else if (store.platform === EPlatform.AMAZON) configValidation = AmazonConfigSchema.partial().safeParse(config);
+      else if (store.platform === EPlatform.WOOCOMMERCE) configValidation = WooCommerceConfigSchema.partial().safeParse(config);
+      else return { success: false, message: 'Invalid platform selected.' };
+
+      if (!configValidation.success) return { success: false, message: `Incorrect credential fields for ${store.platform}.` };
+    }
+
+    // 5. Build the update object
+    const updateFields: Record<string, unknown> = {};
+    if (name) updateFields.name = name;
+    if (isSyncEnabled !== undefined) updateFields.isSyncEnabled = isSyncEnabled;
+
+    // 💡 Don't set 'config' directly. Set 'config.key'
+    if (config) {
+      Object.keys(config).forEach((key) => {
+        const value = config[key] as string | null | undefined;
+        // Only update if value is not empty/null
+        if (![undefined, '', null].includes(value)) updateFields[`config.${key}`] = value; // 👈 "config.shopUrl" merges safely
+      });
+    }
+
+    // 5. Edit store
+    const res = await Store.updateOne({ _id: new Types.ObjectId(storeId), userId: new Types.ObjectId(userId) }, { $set: updateFields });
+    if (!res.modifiedCount) return { success: false, message: 'Store not found, access denied or no changes made.' };
+
+    // 6. Return success
+    return { success: true, message: 'Store edited successfully!' };
+  } catch (error) {
+    console.error('🚩 EDIT_STORE_ERROR:', error);
+    return { success: false, message: 'Failed to edit store.' };
   }
 }

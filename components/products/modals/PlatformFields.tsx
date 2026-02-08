@@ -25,7 +25,7 @@ export const PlatformFields = ({ platform, data, onChange, mode }: PlatformField
     case EPlatform.SHOPIFY:
       return (
         <>
-          <ModalInput {...getFieldProps('Shop Domain', 'e.g. my-brand.myshopify.com')} value={data.storeUrl || ''} onChange={(e) => onChange('storeUrl', e.target.value)} />
+          <ModalInput {...getFieldProps('Store Url', 'e.g. my-brand.myshopify.com')} value={data.storeUrl || ''} onChange={(e) => onChange('storeUrl', e.target.value)} />
           <ModalInput {...getFieldProps('Access Token', 'shpat_xxxxxxxxxxxxxxxx')} value={data.accessToken || ''} onChange={(e) => onChange('accessToken', e.target.value)} />
         </>
       );
@@ -49,7 +49,7 @@ export const PlatformFields = ({ platform, data, onChange, mode }: PlatformField
     case EPlatform.WOOCOMMERCE:
       return (
         <>
-          <ModalInput {...getFieldProps('Shop URL', 'https://my-wordpress-site.com')} value={data.storeUrl || ''} onChange={(e) => onChange('storeUrl', e.target.value)} />
+          <ModalInput {...getFieldProps('Store URL', 'https://my-wordpress-site.com')} value={data.storeUrl || ''} onChange={(e) => onChange('storeUrl', e.target.value)} />
           <div className="flex gap-3">
             <div className="flex-1">
               <ModalInput {...getFieldProps('Consumer Key', 'ck_xxxx...')} value={data.consumerKey || ''} onChange={(e) => onChange('consumerKey', e.target.value)} />
