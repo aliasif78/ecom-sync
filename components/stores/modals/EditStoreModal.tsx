@@ -14,6 +14,12 @@ import { StoreRow } from '@/types';
 // Constants
 import { EPlatform } from '@/lib/globalConstants';
 
+// Server Actions
+import { editStoreByIdAction } from '@/actions/stores';
+
+// Shadcn
+import { toast } from 'sonner';
+
 export const EditStoreModal = ({ isOpen, onClose, store }: { isOpen: boolean; onClose: () => void; store: StoreRow }) => {
   // States
   const [isLoading, setIsLoading] = useState(false);
@@ -21,18 +27,23 @@ export const EditStoreModal = ({ isOpen, onClose, store }: { isOpen: boolean; on
   const [isSyncEnabled, setIsSyncEnabled] = useState<boolean>(store.isSyncEnabled || true);
   const [credentials, setCredentials] = useState<Record<string, string>>(store.config || {});
 
-  const handleCredentialChange = (key: string, value: string) => {
-    setCredentials((prev) => ({ ...prev, [key]: value }));
-  };
+  // Functions
+  const handleCredentialChange = (key: string, value: string) => setCredentials((prev) => ({ ...prev, [key]: value }));
 
   const handleSubmit = async () => {
     setIsLoading(true);
-    // Simulate API Call
-    console.log('Updating Store:', { _id: store._id, name, isSyncEnabled, credentials }); // credentials will only have *new* values
-    setTimeout(() => {
-      setIsLoading(false);
+    const res = await editStoreByIdAction(store._id, { name, config: credentials, isSyncEnabled });
+
+    // Success
+    if (res.success) {
       onClose();
-    }, 1000);
+      toast.success(res.message);
+    }
+
+    // Error
+    else toast.error(res.message);
+
+    setIsLoading(false);
   };
 
   return (
