@@ -12,6 +12,8 @@ import { useStoreModals } from '@/contexts/StoreModalsProvider';
 
 // BE Functions
 import { deleteStoreByIdAction } from '@/actions/stores';
+
+// Shadcn
 import { toast } from 'sonner';
 
 // Interfaces
@@ -26,21 +28,17 @@ const formatDate = (dateString?: string) => {
 };
 
 const getPlatformStyle = (platform: string) => {
-  switch (platform) {
-    case 'SHOPIFY':
-      return { label: 'Shopify', color: 'text-emerald-400 bg-emerald-400/10 border-emerald-400/20' };
-    case 'AMAZON':
-      return { label: 'Amazon Mock', color: 'text-amber-400 bg-amber-400/10 border-amber-400/20' };
-    case 'WOOCOMMERCE':
-      return { label: 'WooCommerce', color: 'text-purple-400 bg-purple-400/10 border-purple-400/20' };
-    default:
-      return { label: platform, color: 'text-slate-400 bg-slate-400/10 border-slate-400/20' };
-  }
+  if (platform === 'SHOPIFY') return { label: 'Shopify', color: 'text-emerald-400 bg-emerald-400/10 border-emerald-400/20' };
+  if (platform === 'AMAZON') return { label: 'Amazon Mock', color: 'text-amber-400 bg-amber-400/10 border-amber-400/20' };
+  if (platform === 'WOOCOMMERCE') return { label: 'WooCommerce', color: 'text-purple-400 bg-purple-400/10 border-purple-400/20' };
+  return { label: platform, color: 'text-slate-400 bg-slate-400/10 border-slate-400/20' };
 };
 
 const StoreTable = ({ stores }: Props) => {
+  // Hooks
   const { openEditStoreModal } = useStoreModals();
 
+  // Functions
   const handleDelete = async (id: string) => {
     if (confirm('Are you sure you want to disconnect this store? Synchronization will stop immediately.')) {
       const res = await deleteStoreByIdAction(id);
@@ -55,9 +53,7 @@ const StoreTable = ({ stores }: Props) => {
     }
   };
 
-  const handleEdit = (store: StoreRow) => {
-    openEditStoreModal(store);
-  };
+  const handleEdit = (store: StoreRow) => openEditStoreModal(store);
 
   return (
     <Table title="Active Channels" description="Manage your connected e-commerce integrations" recordCount={stores.length} headers={['Store Identity', 'Platform', 'Connection', 'Sync Status', 'Last Activity', 'Actions']}>

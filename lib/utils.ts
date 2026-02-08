@@ -24,6 +24,6 @@ export const isDuplicateError = (error: unknown): boolean => {
 };
 
 export const getKeyPattern = (error: unknown) => {
-  if (typeof error === 'object' && error && 'keyPattern' in error) return (error as { keyPattern: { storeUrl?: string; name?: string } }).keyPattern;
+  if (typeof error === 'object' && error && 'keyPattern' in error) return (error as { keyPattern: { config?: { storeUrl?: string }; name?: string } }).keyPattern;
   return null;
 };

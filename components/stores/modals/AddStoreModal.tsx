@@ -30,7 +30,7 @@ export const AddStoreModal = ({ isOpen, onClose }: { isOpen: boolean; onClose: (
   const [platform, setPlatform] = useState<EPlatform>(EPlatform.SHOPIFY);
 
   // Flat State for Form Inputs (easier to manage in UI)
-  const [formData, setFormData] = useState({ name: '', shopUrl: '', accessToken: '', apiKey: '', endpoint: 'US', consumerKey: '', consumerSecret: '', isSyncEnabled: true });
+  const [formData, setFormData] = useState({ name: '', storeUrl: '', accessToken: '', apiKey: '', endpoint: 'US', consumerKey: '', consumerSecret: '', isSyncEnabled: true });
 
   // Helper to update state
   const handleChange = (field: string, value: string | boolean) => setFormData((prev) => ({ ...prev, [field]: value }));
@@ -43,9 +43,9 @@ export const AddStoreModal = ({ isOpen, onClose }: { isOpen: boolean; onClose: (
       // This maps the flat form state to the nested structure Zod expects
       let config: Record<string, unknown> = {};
 
-      if (platform === EPlatform.SHOPIFY) config = { shopUrl: formData.shopUrl, accessToken: formData.accessToken };
+      if (platform === EPlatform.SHOPIFY) config = { storeUrl: formData.storeUrl, accessToken: formData.accessToken };
       else if (platform === EPlatform.AMAZON) config = { apiKey: formData.apiKey, endpoint: formData.endpoint };
-      else if (platform === EPlatform.WOOCOMMERCE) config = { shopUrl: formData.shopUrl, consumerKey: formData.consumerKey, consumerSecret: formData.consumerSecret };
+      else if (platform === EPlatform.WOOCOMMERCE) config = { storeUrl: formData.storeUrl, consumerKey: formData.consumerKey, consumerSecret: formData.consumerSecret };
 
       // 2. Call the Server Action
       const result = await addStoreAction({ name: formData.name, platform, isSyncEnabled: formData.isSyncEnabled, config });

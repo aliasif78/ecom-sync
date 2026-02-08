@@ -19,7 +19,7 @@ export const EditStoreModal = ({ isOpen, onClose, store }: { isOpen: boolean; on
   const [isLoading, setIsLoading] = useState(false);
   const [name, setName] = useState(store.name || '');
   const [isSyncEnabled, setIsSyncEnabled] = useState<boolean>(store.isSyncEnabled || true);
-  const [credentials, setCredentials] = useState<Record<string, string>>({});
+  const [credentials, setCredentials] = useState<Record<string, string>>(store.config || {});
 
   const handleCredentialChange = (key: string, value: string) => {
     setCredentials((prev) => ({ ...prev, [key]: value }));

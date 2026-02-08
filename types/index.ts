@@ -62,6 +62,7 @@ export interface StoreRow {
   isConnected: boolean;
   isSyncEnabled: boolean;
   lastSyncAt?: string;
+  config: Record<string, string>;
 }
 
 export interface StoreFormState {
@@ -70,7 +71,7 @@ export interface StoreFormState {
   isSyncEnabled?: boolean;
 
   // Shopify
-  shopUrl?: string;
+  storeUrl?: string;
   accessToken?: string;
 
   // Amazon

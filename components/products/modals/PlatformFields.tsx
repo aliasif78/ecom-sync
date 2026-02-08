@@ -25,8 +25,8 @@ export const PlatformFields = ({ platform, data, onChange, mode }: PlatformField
     case EPlatform.SHOPIFY:
       return (
         <>
-          <ModalInput {...getFieldProps('Shop Domain', 'e.g. my-brand.myshopify.com')} value={data.shopUrl || ''} onChange={(e) => onChange('shopUrl', e.target.value)} />
-          <ModalInput {...getFieldProps('Access Token', 'shpat_xxxxxxxxxxxxxxxx')} value={data.accessToken || ''} onChange={(e) => onChange('accessToken', e.target.value)} type="password" />
+          <ModalInput {...getFieldProps('Shop Domain', 'e.g. my-brand.myshopify.com')} value={data.storeUrl || ''} onChange={(e) => onChange('storeUrl', e.target.value)} />
+          <ModalInput {...getFieldProps('Access Token', 'shpat_xxxxxxxxxxxxxxxx')} value={data.accessToken || ''} onChange={(e) => onChange('accessToken', e.target.value)} />
         </>
       );
 
@@ -49,13 +49,13 @@ export const PlatformFields = ({ platform, data, onChange, mode }: PlatformField
     case EPlatform.WOOCOMMERCE:
       return (
         <>
-          <ModalInput {...getFieldProps('Website URL', 'https://my-wordpress-site.com')} value={data.shopUrl || ''} onChange={(e) => onChange('shopUrl', e.target.value)} />
+          <ModalInput {...getFieldProps('Shop URL', 'https://my-wordpress-site.com')} value={data.storeUrl || ''} onChange={(e) => onChange('storeUrl', e.target.value)} />
           <div className="flex gap-3">
             <div className="flex-1">
               <ModalInput {...getFieldProps('Consumer Key', 'ck_xxxx...')} value={data.consumerKey || ''} onChange={(e) => onChange('consumerKey', e.target.value)} />
             </div>
             <div className="flex-1">
-              <ModalInput {...getFieldProps('Consumer Secret', 'cs_xxxx...')} value={data.consumerSecret || ''} onChange={(e) => onChange('consumerSecret', e.target.value)} type="password" />
+              <ModalInput {...getFieldProps('Consumer Secret', 'cs_xxxx...')} value={data.consumerSecret || ''} onChange={(e) => onChange('consumerSecret', e.target.value)} />
             </div>
           </div>
         </>

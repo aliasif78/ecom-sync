@@ -22,9 +22,9 @@ export interface AddStoreParams {
 }
 
 // --- Zod Schemas (The Bouncer) ---
-const ShopifyConfigSchema = z.object({ shopUrl: z.url(), accessToken: z.string().min(10) });
+const ShopifyConfigSchema = z.object({ storeUrl: z.url(), accessToken: z.string().min(10) });
 const AmazonConfigSchema = z.object({ apiKey: z.string().min(5), endpoint: z.enum(['US', 'EU']) });
-const WooCommerceConfigSchema = z.object({ shopUrl: z.url(), consumerKey: z.string().startsWith('ck_'), consumerSecret: z.string().startsWith('cs_') });
+const WooCommerceConfigSchema = z.object({ storeUrl: z.url(), consumerKey: z.string().startsWith('ck_'), consumerSecret: z.string().startsWith('cs_') });
 
 export async function addStore(params: AddStoreParams) {
   try {
@@ -34,26 +34,13 @@ export async function addStore(params: AddStoreParams) {
 
     // 2. Platform-Specific Validation & Identity Extraction
     let configValidation;
-    let uniqueIdentity = '';
 
     // Shopify
-    if (platform === EPlatform.SHOPIFY) {
-      configValidation = ShopifyConfigSchema.safeParse(config);
-      if (configValidation.success) uniqueIdentity = configValidation.data.shopUrl;
-    }
-
+    if (platform === EPlatform.SHOPIFY) configValidation = ShopifyConfigSchema.safeParse(config);
     // Amazon
-    else if (platform === EPlatform.AMAZON) {
-      configValidation = AmazonConfigSchema.safeParse(config);
-      if (configValidation.success) uniqueIdentity = configValidation.data.apiKey;
-    }
-
+    else if (platform === EPlatform.AMAZON) configValidation = AmazonConfigSchema.safeParse(config);
     // WooCommerce
-    else if (platform === EPlatform.WOOCOMMERCE) {
-      configValidation = WooCommerceConfigSchema.safeParse(config);
-      if (configValidation.success) uniqueIdentity = configValidation.data.shopUrl;
-    }
-
+    else if (platform === EPlatform.WOOCOMMERCE) configValidation = WooCommerceConfigSchema.safeParse(config);
     // Invalid Platform
     else return { success: false, message: 'Invalid platform selected.' };
 
@@ -64,7 +51,7 @@ export async function addStore(params: AddStoreParams) {
     await connectDB();
 
     // 5. Create Store
-    const newStore = await Store.create({ userId: new Types.ObjectId(userId), name, platform, storeUrl: uniqueIdentity, config: configValidation.data, isSyncEnabled, isConnected: false });
+    const newStore = await Store.create({ userId: new Types.ObjectId(userId), name, platform, config: configValidation.data, isSyncEnabled, isConnected: false });
 
     // 6. Return store
     return { success: true, message: 'Store added successfully! Verifying connection...', storeId: newStore._id.toString() };
@@ -76,7 +63,7 @@ export async function addStore(params: AddStoreParams) {
     // We have a compound index on { userId: 1, name: 1 }
     if (isDuplicateError(error)) {
       const pattern = getKeyPattern(error);
-      if (pattern?.storeUrl) return { success: false, message: 'This store is already connected.' };
+      if (pattern?.config?.storeUrl) return { success: false, message: 'This store is already connected.' };
       if (pattern?.name) return { success: false, message: 'You already have a store with this nickname.' };
     }
 
@@ -91,7 +78,7 @@ export async function getStoresByUserId({ userId }: { userId: string }) {
 
     // 2. Fetch stores
     const stores = await Store.find({ userId: new Types.ObjectId(userId) })
-      .select('-config')
+      .select('+config')
       .sort({ createdAt: -1 })
       .lean();
 
