@@ -8,6 +8,10 @@ import { NextResponse, type NextRequest } from 'next/server';
 import { getEnvVariables } from './utils/clientUtils';
 
 export async function updateSession(request: NextRequest) {
+  // ⚡ BYPASS AUTH FOR INNGEST
+  // We do this FIRST to save resources. No need to create a Supabase client for a webhook.
+  if (request.nextUrl.pathname.startsWith('/api/inngest')) return NextResponse.next();
+
   // 1. Prepare the response (we might need to modify headers)
   let response = NextResponse.next({ request: { headers: request.headers } });
 
