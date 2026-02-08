@@ -16,9 +16,7 @@ import { EPlatform } from '@/lib/globalConstants';
 
 // Server Actions
 import { editStoreByIdAction } from '@/actions/stores';
-
-// Shadcn
-import { toast } from 'sonner';
+import { runServerAction } from '@/lib/utils';
 
 export const EditStoreModal = ({ isOpen, onClose, store }: { isOpen: boolean; onClose: () => void; store: StoreRow }) => {
   // States
@@ -29,22 +27,7 @@ export const EditStoreModal = ({ isOpen, onClose, store }: { isOpen: boolean; on
 
   // Functions
   const handleCredentialChange = (key: string, value: string) => setCredentials((prev) => ({ ...prev, [key]: value }));
-
-  const handleSubmit = async () => {
-    setIsLoading(true);
-    const res = await editStoreByIdAction(store._id, { name, config: credentials, isSyncEnabled });
-
-    // Success
-    if (res.success) {
-      onClose();
-      toast.success(res.message);
-    }
-
-    // Error
-    else toast.error(res.message);
-
-    setIsLoading(false);
-  };
+  const handleSubmit = () => runServerAction({ validate: () => !!(name || Object.keys(credentials).length > 0), action: () => editStoreByIdAction(store._id, { name, config: credentials, isSyncEnabled }), setIsLoading, onSuccess: onClose });
 
   return (
     <ModalShell isOpen={isOpen}>

@@ -1,11 +1,9 @@
 // React
 import { useState } from 'react';
 
-// Shadcn
-import { toast } from 'sonner';
-
 // Server Actions
 import { updateProduct } from '@/actions/products';
+import { runServerAction } from '@/lib/utils';
 
 // Components
 import { ModalShell, ModalHeader, ModalInput, ModalFooter } from './Atoms';
@@ -19,20 +17,7 @@ export default function EditProductModal({ isOpen, onClose, product }: { isOpen:
   const [form, setForm] = useState({ name: product.name || '', price: product.price.toString() || '', image: product.image || '' });
 
   // Functions
-  const handleSubmit = async () => {
-    setIsLoading(true);
-
-    const res = await updateProduct({ _id: product._id, ...form, price: Number(form.price) });
-    setIsLoading(false);
-
-    if (res.success) {
-      toast.success('Product updated!');
-      onClose();
-    } else {
-      console.error(res.message);
-      toast.error(res.message);
-    }
-  };
+  const handleSubmit = () => runServerAction({ validate: () => !!(form.name && form.price && form.image), action: () => updateProduct({ _id: product._id, ...form, price: Number(form.price) }), setIsLoading, onSuccess: onClose, successMessage: 'Product updated!' });
 
   return (
     <ModalShell isOpen={isOpen}>

@@ -1,11 +1,9 @@
 // React
 import { useState } from 'react';
 
-// Dependencies
-import { toast } from 'sonner';
-
 // Server Actions
 import { addProduct } from '@/actions/products';
+import { runServerAction } from '@/lib/utils';
 
 // Components
 import { ModalShell, ModalHeader, ModalInput, ModalFooter } from './Atoms';
@@ -17,26 +15,7 @@ export default function AddProductModal({ isOpen, onClose }: { isOpen: boolean; 
 
   // Functions
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => setForm({ ...form, [e.target.name]: e.target.value });
-
-  const handleSubmit = async () => {
-    if (!form.name || !form.sku || !form.price) return toast.error('Please fill required fields');
-
-    setIsLoading(true);
-    const res = await addProduct({ ...form, price: Number(form.price), stock: Number(form.stock) });
-    setIsLoading(false);
-
-    // Success
-    if (res.success) {
-      toast.success('Product created!');
-      onClose();
-    }
-
-    // Error
-    else {
-      console.error(res.message);
-      toast.error(res.message);
-    }
-  };
+  const handleSubmit = () => runServerAction({ validate: () => !!(form.name && form.sku && form.price), action: () => addProduct({ ...form, price: Number(form.price), stock: Number(form.stock) }), setIsLoading, onSuccess: onClose, successMessage: 'Product created!' });
 
   return (
     <ModalShell isOpen={isOpen}>
