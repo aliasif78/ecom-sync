@@ -10,9 +10,10 @@ export class MockAdapter implements InventoryAdapter {
 
   async validateConnection(): Promise<{ success: true } | { success: false; message: string }> {
     console.log('🔌 [MOCK] Validating connection...', this.config.apiKey);
+    await new Promise((resolve) => setTimeout(resolve, 2000));
 
     // Simulate a random connection error
-    if (Math.random() < 0.1) return { success: false, message: 'Simulated connection failure' };
+    if (Math.random() < 0.3) return { success: false, message: 'Simulated connection failure' };
     return { success: true };
   }
 
@@ -27,10 +28,10 @@ export class MockAdapter implements InventoryAdapter {
     console.log(`🚀 [MOCK] Updating ${sku} to stock: ${newStock}`);
 
     // Simulate a delay
-    await new Promise((resolve) => setTimeout(resolve, 500));
+    await new Promise((resolve) => setTimeout(resolve, 2000));
 
     // Simulate a random failure
-    if (Math.random() < 0.1) return { success: false, message: 'Simulated update failure' };
+    if (Math.random() < 0.3) return { success: false, message: 'Simulated update failure' };
 
     // 90% chance of success
     return { success: true, message: 'Stock updated successfully' };
