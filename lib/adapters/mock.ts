@@ -31,9 +31,15 @@ export class MockAdapter implements InventoryAdapter {
     await new Promise((resolve) => setTimeout(resolve, 2000));
 
     // Simulate a random failure
-    if (Math.random() < 0.3) return { success: false, message: 'Simulated update failure' };
+    const rand = Math.random();
+    console.log('Random number:', rand);
+    if (rand < 0.3) {
+      console.log('⛔️ ERROR UPDATING STOCK RETRY ⛔️');
+      throw new Error('Platform API is down (Simulated Error)');
+    }
 
-    // 90% chance of success
+    // 30% chance of success
+    console.log('✅ SUCCESSFULLY UPDATED STOCK ✅');
     return { success: true, message: 'Stock updated successfully' };
   }
 }

@@ -13,6 +13,7 @@ import mongoose from 'mongoose';
 // Constants
 import { DEF_LOC_ID, PLATFORMS } from '@/lib/globalConstants';
 import { getCurrentUser } from '@/lib/users';
+import { inngest } from '@/lib/inngest/client';
 
 export const syncProductStock = async (productId: string, newStock: number, reason: string, platform: (typeof PLATFORMS)[number], description?: string) => {
   const isProduction = process.env.NODE_ENV === 'production'; // 'development' locally, 'production' on Vercel
@@ -79,7 +80,10 @@ export const syncProductStock = async (productId: string, newStock: number, reas
     // This tells Next.js: "The data at /products is stale. Fetch it again."
     revalidatePath('/products');
 
-    // 11. Return success
+    // 11. Fire the inngest sync function
+    await inngest.send({ name: 'inventory/stock.updated', data: { sku: product.sku, quantity: newStock } });
+
+    // 12. Return success
     return { success: true, data: JSON.parse(JSON.stringify(product)) }; // Next.js serialization safety
   } catch (error) {
     console.error('🚩 SYNC_PRODUCT_STOCK_ERROR:', error);
