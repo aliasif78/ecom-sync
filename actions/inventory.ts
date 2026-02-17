@@ -88,12 +88,12 @@ export const syncProductStock = async (productId: string, newStock: number, reas
     // 12. Commit Transaction
     if (session) await session.commitTransaction();
 
-    // 13. Refresh UI (Critical) - This tells Next.js: "The data at /products is stale. Fetch it again."
-    revalidatePath('/products');
-
-    // 14. Lock the mutex
+    // 13. Lock the mutex
     await setSyncMutex(userId, true);
     isSyncLocked = true;
+
+    // 14. Refresh UI (Critical) - This tells Next.js: "The data at /products is stale. Fetch it again."
+    revalidatePath('/products');
 
     // 15. Fire the inngest sync function to update all actual real-world stores
     await inngest.send({ name: 'inventory/stock.updated', data: { sku: product.sku, quantity: newStock, userId } });
