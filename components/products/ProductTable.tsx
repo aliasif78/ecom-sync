@@ -18,6 +18,7 @@ import { forceSyncAllProducts } from '@/actions/inventory';
 // Interfaces
 interface Props {
   products: ProductRow[];
+  isSyncing?: boolean;
 }
 
 // Helpers
@@ -29,15 +30,21 @@ const getStockStatus = (stock: number) => {
   return { label: 'In Stock', color: 'bg-emerald-500/20 text-emerald-300 ring-1 ring-emerald-500/30' };
 };
 
-const ProductTable = ({ products }: Props) => {
+const ProductTable = ({ products, isSyncing }: Props) => {
+  // Hooks
   const { openSyncModal, openEditModal, openHistoryModal } = useProductModals();
 
+  // Functions
   const handleDelete = async (id: string) => {
     if (confirm('Are you sure that you want to delete this product?')) await deleteProduct(id);
   };
 
+  const syncModalHandler = (product: ProductRow) => {
+    if (!isSyncing) openSyncModal(product);
+  };
+
   return (
-    <Table title="Global Inventory" description="Real-time stock levels across all channels" recordCount={products.length} headers={['Product', 'Price', 'Status', 'Inventory', 'Actions']} headerBtn={{ label: 'Force Sync All', icon: <PiSparkleFill />, onClick: () => forceSyncAllProducts() }}>
+    <Table title="Global Inventory" description="Real-time stock levels across all channels" recordCount={products.length} headers={['Product', 'Price', 'Status', 'Inventory', 'Actions']} headerBtn={{ label: 'Force Sync All', icon: <PiSparkleFill />, onClick: () => forceSyncAllProducts(), disabled: isSyncing }}>
       {products.map((product) => {
         const stockStatus = getStockStatus(product.stock);
 
@@ -80,7 +87,7 @@ const ProductTable = ({ products }: Props) => {
                 <ActionButton icon={<Icons.Delete />} onClick={() => handleDelete(product._id)} variant="danger" title="Delete Product" />
 
                 {/* Primary Sync Button */}
-                <button onClick={() => openSyncModal(product)} className="ml-2 flex items-center gap-2 rounded-lg bg-indigo-600 px-4 py-2.5 font-semibold text-white shadow-lg shadow-indigo-500/20 transition-all hover:-translate-y-0.5 hover:bg-indigo-500 hover:shadow-indigo-500/40">
+                <button disabled={isSyncing} onClick={() => syncModalHandler(product)} className="ml-2 flex items-center gap-2 rounded-lg bg-indigo-600 px-4 py-2.5 font-semibold text-white shadow-lg shadow-indigo-500/20 transition-all hover:-translate-y-0.5 hover:bg-indigo-500 hover:shadow-indigo-500/40 disabled:cursor-not-allowed disabled:opacity-50">
                   <Icons.Sync />
                   <span>Sync</span>
                 </button>

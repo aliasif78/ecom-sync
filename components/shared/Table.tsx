@@ -5,7 +5,7 @@ interface DataTableProps {
   description: string;
   recordCount: number;
   headers: string[]; // e.g. ["Product", "Price", "Status"]
-  headerBtn?: { label: string; icon: ReactNode; onClick: () => void };
+  headerBtn?: { label: string; icon: ReactNode; onClick: () => void; disabled?: boolean };
   children: ReactNode; // The <tbody> content (rows)
 }
 
@@ -25,7 +25,7 @@ export const Table = ({ title, description, recordCount, headers, headerBtn, chi
           <span className="flex items-center gap-2 rounded-full border border-purple-500/30 bg-slate-800/80 px-4 py-2 text-sm font-semibold text-purple-300 shadow-lg">{recordCount} Records</span>
 
           {headerBtn && (
-            <button onClick={headerBtn.onClick} className="flex items-center gap-2 rounded-md bg-linear-to-l from-pink-700 to-indigo-800 px-4 py-2 text-white hover:bg-linear-to-bl">
+            <button onClick={headerBtn.onClick} disabled={headerBtn.disabled} className="flex items-center gap-2 rounded-md bg-linear-to-l from-pink-700 to-indigo-800 px-4 py-2 text-white hover:bg-linear-to-bl disabled:cursor-not-allowed disabled:opacity-50">
               {headerBtn.icon}
               {headerBtn.label}
             </button>

@@ -2,6 +2,7 @@
 
 // API
 import { getProducts } from '@/lib/products';
+import { getCurrentUser } from '@/lib/users';
 
 // Components
 import ProductHeader from '@/components/products/ProductHeader';
@@ -10,6 +11,10 @@ import ProductTable from '@/components/products/ProductTable';
 const Page = async () => {
   // API
   const products = await getProducts();
+  const { user } = await getCurrentUser();
+
+  // Constants
+  const isSyncing = user?.isSyncing || false;
 
   // Calculate some quick stats for the header
   const totalStock = products.reduce((acc, p) => acc + p.stock, 0);
@@ -23,7 +28,7 @@ const Page = async () => {
         <ProductHeader totalStock={totalStock} lowStockCount={lowStockCount} />
 
         {/* The Main Data Table */}
-        <ProductTable products={products} />
+        <ProductTable products={products} isSyncing={isSyncing} />
       </div>
     </div>
   );

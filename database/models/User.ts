@@ -43,7 +43,7 @@ interface IUser extends Document {
   amazon?: TPlatform;
   woocommerce?: TPlatform;
 
-  // Mutex
+  // Mutex - SKU of the product being synced or "all" or '' for none
   isSyncing: boolean;
 
   // Timestamps

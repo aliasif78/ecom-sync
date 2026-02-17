@@ -187,3 +187,9 @@ export const getCurrentUser = async () => {
     return { success: false, message: 'Failed to get current user' };
   }
 };
+
+export const setSyncMutex = async (userId: string, status: boolean) => {
+  await connectDB();
+  console.log((!status ? 'UN' : '') + 'LOCKING MUTEX 😶‍🌫️');
+  return await User.findByIdAndUpdate(userId, { isSyncing: status });
+};
