@@ -15,6 +15,7 @@ import { EPlatform } from '../globalConstants';
 
 // Utils
 import { setSyncMutex } from '../users';
+import { pusherServer } from '../pusher';
 
 // Helper Functions
 // The Risk: Inngest works by "replaying" your function. On replay, it expects the same code to run. If you change the internal logic of getProducts later, the replay might behave unexpectedly.
@@ -99,6 +100,9 @@ export const syncStockToStores = inngest.createFunction(
     } finally {
       // Release the mutex
       if (!isForced) await step.run('release-lock', () => setSyncMutex(userId, false));
+
+      // 📣 Tell the UI the work is done - We use the userId as the channel name so we only notify THIS user
+      await pusherServer.trigger(`user-${userId}`, 'sync-finished', { message: 'Inventory sync complete' });
     }
   }
 );
@@ -132,7 +136,11 @@ export const forceSyncAllStores = inngest.createFunction(
       console.error(error);
       throw new Error('ERROR IN FORCE SYNCING ALL PRODUCTS');
     } finally {
-      await step.run('release-lock', () => setSyncMutex(userId, false)); // Release the mutex
+      // Release the mutex
+      await step.run('release-lock', () => setSyncMutex(userId, false));
+
+      // 📣 Tell the UI the work is done - We use the userId as the channel name so we only notify THIS user
+      await pusherServer.trigger(`user-${userId}`, 'sync-finished', { message: 'Inventory sync complete' });
     }
   }
 );
