@@ -5,20 +5,32 @@ interface DataTableProps {
   description: string;
   recordCount: number;
   headers: string[]; // e.g. ["Product", "Price", "Status"]
+  headerBtn?: { label: string; icon: ReactNode; onClick: () => void };
   children: ReactNode; // The <tbody> content (rows)
 }
 
-export const Table = ({ title, description, recordCount, headers, children }: DataTableProps) => {
+export const Table = ({ title, description, recordCount, headers, headerBtn, children }: DataTableProps) => {
   return (
     <div className="w-full overflow-hidden rounded-2xl border border-white/10 bg-slate-900 shadow-2xl backdrop-blur-xl">
       {/* Header */}
       <div className="flex items-center justify-between border-b border-white/10 bg-slate-800/50 px-8 py-6 backdrop-blur-sm">
+        {/* Title & Description */}
         <div>
           <h3 className="text-2xl font-bold text-white">{title}</h3>
           <p className="mt-1 text-sm text-slate-400">{description}</p>
         </div>
 
-        <span className="flex items-center gap-2 rounded-full border border-purple-500/30 bg-slate-800/80 px-4 py-2 text-sm font-semibold text-purple-300 shadow-lg">{recordCount} Records</span>
+        {/* Tags & Button */}
+        <div className="flex flex-row gap-4">
+          <span className="flex items-center gap-2 rounded-full border border-purple-500/30 bg-slate-800/80 px-4 py-2 text-sm font-semibold text-purple-300 shadow-lg">{recordCount} Records</span>
+
+          {headerBtn && (
+            <button onClick={headerBtn.onClick} className="flex items-center gap-2 rounded-md bg-linear-to-l from-pink-700 to-indigo-800 px-4 py-2 text-white hover:bg-linear-to-bl">
+              {headerBtn.icon}
+              {headerBtn.label}
+            </button>
+          )}
+        </div>
       </div>
 
       {/* Table */}
