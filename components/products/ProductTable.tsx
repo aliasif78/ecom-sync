@@ -13,6 +13,7 @@ import { ProductRow } from '@/types';
 
 // Icons
 import { PiSparkleFill } from 'react-icons/pi';
+import { forceSyncAllProducts } from '@/actions/inventory';
 
 // Interfaces
 interface Props {
@@ -36,7 +37,7 @@ const ProductTable = ({ products }: Props) => {
   };
 
   return (
-    <Table title="Global Inventory" description="Real-time stock levels across all channels" recordCount={products.length} headers={['Product', 'Price', 'Status', 'Inventory', 'Actions']} headerBtn={{ label: 'Force Sync All', icon: <PiSparkleFill />, onClick: () => {} }}>
+    <Table title="Global Inventory" description="Real-time stock levels across all channels" recordCount={products.length} headers={['Product', 'Price', 'Status', 'Inventory', 'Actions']} headerBtn={{ label: 'Force Sync All', icon: <PiSparkleFill />, onClick: () => forceSyncAllProducts() }}>
       {products.map((product) => {
         const stockStatus = getStockStatus(product.stock);
 

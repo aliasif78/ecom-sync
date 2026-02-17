@@ -43,6 +43,9 @@ interface IUser extends Document {
   amazon?: TPlatform;
   woocommerce?: TPlatform;
 
+  // Mutex
+  isSyncing: boolean;
+
   // Timestamps
   createdAt: Date;
   updatedAt: Date;
@@ -72,6 +75,9 @@ const UserSchema = new Schema<IUser>(
     shopify: { accessToken: { type: String, select: false }, shopName: String },
     amazon: { accessToken: { type: String, select: false }, shopName: String },
     woocommerce: { accessToken: { type: String, select: false }, shopName: String },
+
+    // Separate sync flag that acts as a mutex to prevent race conditions
+    isSyncing: { type: Boolean, default: false },
   },
 
   { timestamps: true, toJSON: { virtuals: true }, toObject: { virtuals: true } }

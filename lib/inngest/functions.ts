@@ -10,7 +10,7 @@ import Product from '@/database/models/Product';
 import { getAdapter } from '@/lib/adapters';
 
 // Types
-import { ProductRow, StoreRow } from '@/types';
+import { ProductRow } from '@/types';
 import { EPlatform } from '../globalConstants';
 
 // Helper Functions

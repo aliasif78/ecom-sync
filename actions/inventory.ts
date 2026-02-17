@@ -7,6 +7,7 @@ import { revalidatePath } from 'next/cache';
 // Database
 import { connectDB } from '@/database/mongoose';
 import Product, { IInventoryLevel } from '@/database/models/Product';
+import Store from '@/database/models/Store';
 import InventoryLedger from '@/database/models/InventoryLedger';
 import mongoose from 'mongoose';
 
@@ -65,7 +66,7 @@ export const syncProductStock = async (productId: string, newStock: number, reas
     else product.inventoryByLocation.push({ locationId: DEF_LOC_ID, quantity: newStock });
 
     // Update the root stock number to match
-    // product.stock = newStock;
+    product.stock = newStock;
 
     // 7. Save the product
     await product.save({ session });
@@ -76,12 +77,11 @@ export const syncProductStock = async (productId: string, newStock: number, reas
     // 9. Commit Transaction
     if (session) await session.commitTransaction();
 
-    // 10. Refresh UI (Critical)
-    // This tells Next.js: "The data at /products is stale. Fetch it again."
+    // 10. Refresh UI (Critical) - This tells Next.js: "The data at /products is stale. Fetch it again."
     revalidatePath('/products');
 
-    // 11. Fire the inngest sync function
-    await inngest.send({ name: 'inventory/stock.updated', data: { sku: product.sku, quantity: newStock } });
+    // 11. Fire the inngest sync function to update all actual real-world stores
+    await inngest.send({ name: 'inventory/stock.updated', data: { sku: product.sku, quantity: newStock, userId: user._id.toString() } });
 
     // 12. Return success
     return { success: true, data: JSON.parse(JSON.stringify(product)) }; // Next.js serialization safety
@@ -131,5 +131,35 @@ export const getProductHistory = async (productId: string) => {
   } catch (error) {
     console.error('🚩 GET_PRODUCT_HISTORY_ERROR:', error);
     return { success: false, error: 'Failed to get product history' };
+  }
+};
+
+export const forceSyncAllProducts = async () => {
+  try {
+    // 1. Get the current user
+    const { success, user, message } = await getCurrentUser();
+
+    if (!success || !user) {
+      console.error(`🚩 FORCE_SYNC_ALL_PRODUCTS_ERROR: User not found`);
+      return { success: false, message: message || 'Unauthorized' };
+    }
+
+    // 2. Connect to the database
+    await connectDB();
+
+    // 3. Check if products & stores exist
+    const prodAndStoreExists = await Promise.all([Product.findOne({ userId: user._id }), Store.findOne({ userId: user._id, isSyncEnabled: true })]);
+
+    if (!prodAndStoreExists[0]) return { success: false, error: 'No products found' };
+    if (!prodAndStoreExists[1]) return { success: false, error: 'No stores found' };
+
+    // 4. Tell inngest to sync all products across all stores for the user
+    await inngest.send({ name: 'inventory/force.sync.all', data: { userId: user._id.toString() } });
+
+    // 5. Return success
+    return { success: true, message: 'Synced all products across all stores' };
+  } catch (error) {
+    console.error('🚩 FORCE_SYNC_ALL_PRODUCTS_ERROR:', error);
+    return { success: false, error: 'Failed to force sync all products' };
   }
 };
