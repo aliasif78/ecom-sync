@@ -26,8 +26,13 @@ export default function SyncPusherHandler({ userId }: { userId: string }) {
 
     // 3. Listen for the 'sync-finished' event
     channel.bind('sync-finished', (data: { message: string }) => {
-      toast.success(data.message);
+      // 1. Start the refresh
       router.refresh(); // 🔥 This is the magic: Refresh the server components
+
+      // 2. Show the toast
+      // Since router.refresh doesn't return a promise, we usually
+      // just fire the toast. It stays visible during the transition.
+      toast.success(data.message);
     });
 
     return () => {

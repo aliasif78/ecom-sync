@@ -15,6 +15,9 @@ import { ProductRow } from '@/types';
 import { PiSparkleFill } from 'react-icons/pi';
 import { forceSyncAllProducts } from '@/actions/inventory';
 
+// Constants
+import { MUTEX_ALL } from '@/lib/globalConstants';
+
 // Interfaces
 interface Props {
   products: ProductRow[];
@@ -30,6 +33,13 @@ const getStockStatus = (stock: number) => {
   return { label: 'In Stock', color: 'bg-emerald-500/20 text-emerald-300 ring-1 ring-emerald-500/30' };
 };
 
+// Custom Components
+const Spinner = ({ spin }: { spin?: boolean }) => (
+  <div className={spin ? 'animate-spin' : ''}>
+    <Icons.Sync />
+  </div>
+);
+
 const ProductTable = ({ products, isSyncing }: Props) => {
   // Hooks
   const { openSyncModal, openEditModal, openHistoryModal } = useProductModals();
@@ -43,11 +53,15 @@ const ProductTable = ({ products, isSyncing }: Props) => {
     if (!isSyncing.includes(product.sku)) openSyncModal(product);
   };
 
+  // Constants
+  const IS_SYNCING_ALL = isSyncing[0] === MUTEX_ALL;
+
   return (
-    <Table title="Global Inventory" description="Real-time stock levels across all channels" recordCount={products.length} headers={['Product', 'Price', 'Status', 'Inventory', 'Actions']} headerBtn={{ label: isSyncing.length > 0 ? 'Syncing...' : 'Force Sync All', icon: <PiSparkleFill />, onClick: () => forceSyncAllProducts(), disabled: isSyncing.length > 0 }}>
+    <Table title="Global Inventory" description="Real-time stock levels across all channels" recordCount={products.length} headers={['Product', 'Price', 'Status', 'Inventory', 'Actions']} headerBtn={{ label: IS_SYNCING_ALL ? 'Syncing...' : 'Force Sync All', icon: IS_SYNCING_ALL ? <Spinner spin /> : <PiSparkleFill />, onClick: () => forceSyncAllProducts(), disabled: isSyncing.length > 0 }}>
       {products.map((product) => {
         const stockStatus = getStockStatus(product.stock);
-        const disableSync = isSyncing.includes(product.sku);
+        const isThisSyncing = isSyncing.includes(product.sku);
+        const disableSync = isThisSyncing || IS_SYNCING_ALL;
 
         return (
           <tr key={product._id} className="group transition-all duration-300 hover:bg-white/5">
@@ -89,8 +103,8 @@ const ProductTable = ({ products, isSyncing }: Props) => {
 
                 {/* Primary Sync Button */}
                 <button disabled={disableSync} onClick={() => syncModalHandler(product)} className="ml-2 flex items-center gap-2 rounded-lg bg-indigo-600 px-4 py-2.5 font-semibold text-white shadow-lg shadow-indigo-500/20 transition-all hover:-translate-y-0.5 hover:bg-indigo-500 hover:shadow-indigo-500/40 disabled:cursor-not-allowed disabled:opacity-50">
-                  <Icons.Sync />
-                  <span>{disableSync ? 'Syncing...' : 'Sync'}</span>
+                  <Spinner spin={isThisSyncing} />
+                  <span>{isThisSyncing ? 'Syncing...' : 'Sync'}</span>
                 </button>
               </div>
             </td>
