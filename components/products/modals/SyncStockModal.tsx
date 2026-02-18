@@ -52,7 +52,7 @@ export default function SyncStockModal({ isOpen, onClose, product }: { isOpen: b
       }
 
       // Success
-      toast.success('Stock synced successfully');
+      toast.info('Syncing stock...');
       onClose();
     } catch (error) {
       toast.error('Failed to sync stock');

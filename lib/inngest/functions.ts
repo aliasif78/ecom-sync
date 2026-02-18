@@ -102,7 +102,7 @@ export const syncStockToStores = inngest.createFunction(
       if (!isForced) await step.run('release-lock', () => setSyncMutex(userId, false));
 
       // 📣 Tell the UI the work is done - We use the userId as the channel name so we only notify THIS user
-      await pusherServer.trigger(`user-${userId}`, 'sync-finished', { message: 'Inventory sync complete' });
+      await pusherServer.trigger(userId, 'sync-finished', { message: 'Inventory sync complete.' });
     }
   }
 );
@@ -140,7 +140,7 @@ export const forceSyncAllStores = inngest.createFunction(
       await step.run('release-lock', () => setSyncMutex(userId, false));
 
       // 📣 Tell the UI the work is done - We use the userId as the channel name so we only notify THIS user
-      await pusherServer.trigger(`user-${userId}`, 'sync-finished', { message: 'Inventory sync complete' });
+      await pusherServer.trigger(userId, 'sync-finished', { message: 'Inventory sync complete' });
     }
   }
 );

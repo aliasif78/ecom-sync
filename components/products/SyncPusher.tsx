@@ -22,7 +22,7 @@ export default function SyncPusherHandler({ userId }: { userId: string }) {
     const pusher = new Pusher(process.env.NEXT_PUBLIC_PUSHER_KEY!, { cluster: process.env.NEXT_PUBLIC_PUSHER_CLUSTER! });
 
     // 2. Subscribe to the user's specific channel
-    const channel = pusher.subscribe(`user-${userId}`);
+    const channel = pusher.subscribe(userId);
 
     // 3. Listen for the 'sync-finished' event
     channel.bind('sync-finished', (data: { message: string }) => {
@@ -31,7 +31,7 @@ export default function SyncPusherHandler({ userId }: { userId: string }) {
     });
 
     return () => {
-      pusher.unsubscribe(`user-${userId}`);
+      pusher.unsubscribe(userId);
       pusher.disconnect();
     };
   }, [userId, router]);

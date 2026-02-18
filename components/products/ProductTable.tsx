@@ -44,7 +44,7 @@ const ProductTable = ({ products, isSyncing }: Props) => {
   };
 
   return (
-    <Table title="Global Inventory" description="Real-time stock levels across all channels" recordCount={products.length} headers={['Product', 'Price', 'Status', 'Inventory', 'Actions']} headerBtn={{ label: 'Force Sync All', icon: <PiSparkleFill />, onClick: () => forceSyncAllProducts(), disabled: isSyncing }}>
+    <Table title="Global Inventory" description="Real-time stock levels across all channels" recordCount={products.length} headers={['Product', 'Price', 'Status', 'Inventory', 'Actions']} headerBtn={{ label: isSyncing ? 'Syncing...' : 'Force Sync All', icon: <PiSparkleFill />, onClick: () => forceSyncAllProducts(), disabled: isSyncing }}>
       {products.map((product) => {
         const stockStatus = getStockStatus(product.stock);
 
@@ -89,7 +89,7 @@ const ProductTable = ({ products, isSyncing }: Props) => {
                 {/* Primary Sync Button */}
                 <button disabled={isSyncing} onClick={() => syncModalHandler(product)} className="ml-2 flex items-center gap-2 rounded-lg bg-indigo-600 px-4 py-2.5 font-semibold text-white shadow-lg shadow-indigo-500/20 transition-all hover:-translate-y-0.5 hover:bg-indigo-500 hover:shadow-indigo-500/40 disabled:cursor-not-allowed disabled:opacity-50">
                   <Icons.Sync />
-                  <span>Sync</span>
+                  <span>{isSyncing ? 'Syncing...' : 'Sync'}</span>
                 </button>
               </div>
             </td>
