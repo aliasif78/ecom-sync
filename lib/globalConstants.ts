@@ -22,3 +22,6 @@ export const ROLES = [USER, ADMIN];
 export const VERIFIED = 'Verified';
 export const NOT_VERIFIED = 'Not Verified';
 export const VERIFICATION = [VERIFIED, NOT_VERIFIED];
+
+// Sync Mutex
+export const MUTEX_ALL = 'ALL';

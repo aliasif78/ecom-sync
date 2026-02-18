@@ -43,8 +43,8 @@ interface IUser extends Document {
   amazon?: TPlatform;
   woocommerce?: TPlatform;
 
-  // Mutex - SKU of the product being synced or "all" or '' for none
-  isSyncing: boolean;
+  // Mutex - SKUs of the products being synced | [ALL] for global lock | [] for none
+  isSyncing: [string];
 
   // Timestamps
   createdAt: Date;
@@ -77,7 +77,7 @@ const UserSchema = new Schema<IUser>(
     woocommerce: { accessToken: { type: String, select: false }, shopName: String },
 
     // Separate sync flag that acts as a mutex to prevent race conditions
-    isSyncing: { type: Boolean, default: false },
+    isSyncing: { type: [String], default: [] },
   },
 
   { timestamps: true, toJSON: { virtuals: true }, toObject: { virtuals: true } }

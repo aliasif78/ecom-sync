@@ -14,7 +14,7 @@ const Page = async () => {
   const { user } = await getCurrentUser();
 
   // Constants
-  const isSyncing = user?.isSyncing || false;
+  const isSyncing = user?.isSyncing || [];
 
   // Calculate some quick stats for the header
   const totalStock = products.reduce((acc, p) => acc + p.stock, 0);

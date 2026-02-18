@@ -11,10 +11,10 @@ import { getAdapter } from '@/lib/adapters';
 
 // Types
 import { ProductRow } from '@/types';
-import { EPlatform } from '../globalConstants';
+import { EPlatform, MUTEX_ALL } from '../globalConstants';
 
 // Utils
-import { setSyncMutex } from '../users';
+import { removeSyncMutex } from '../users';
 import { pusherServer } from '../pusher';
 
 // Helper Functions
@@ -99,7 +99,7 @@ export const syncStockToStores = inngest.createFunction(
       throw new Error('ERROR IN SYNCING SINGLE PRODUCT');
     } finally {
       // Release the mutex
-      if (!isForced) await step.run('release-lock', () => setSyncMutex(userId, false));
+      if (!isForced) await step.run('release-lock', () => removeSyncMutex(userId, sku));
 
       // 📣 Tell the UI the work is done - We use the userId as the channel name so we only notify THIS user
       await pusherServer.trigger(userId, 'sync-finished', { message: 'Inventory sync complete.' });
@@ -127,17 +127,14 @@ export const forceSyncAllStores = inngest.createFunction(
       // We use Promise.all to run them in parallel (up to the concurrency limits you set).
       await Promise.all(products.map((p: ProductRow) => step.invoke(`sync-product-${p.sku}`, { function: syncStockToStores, data: { sku: p.sku, quantity: p.stock, userId, isForced: true } })));
 
-      // 5. Release the mutex
-      await step.run('release-lock', () => setSyncMutex(userId, false));
-
-      // 6. Return final results
+      // 5. Return final results
       return { message: 'Force Sync Complete', productCount: products.length };
     } catch (error) {
       console.error(error);
       throw new Error('ERROR IN FORCE SYNCING ALL PRODUCTS');
     } finally {
       // Release the mutex
-      await step.run('release-lock', () => setSyncMutex(userId, false));
+      await step.run('release-lock', () => removeSyncMutex(userId, MUTEX_ALL));
 
       // 📣 Tell the UI the work is done - We use the userId as the channel name so we only notify THIS user
       await pusherServer.trigger(userId, 'sync-finished', { message: 'Inventory sync complete' });

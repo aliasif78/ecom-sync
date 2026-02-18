@@ -18,7 +18,7 @@ import { forceSyncAllProducts } from '@/actions/inventory';
 // Interfaces
 interface Props {
   products: ProductRow[];
-  isSyncing?: boolean;
+  isSyncing: string[];
 }
 
 // Helpers
@@ -40,13 +40,14 @@ const ProductTable = ({ products, isSyncing }: Props) => {
   };
 
   const syncModalHandler = (product: ProductRow) => {
-    if (!isSyncing) openSyncModal(product);
+    if (!isSyncing.includes(product.sku)) openSyncModal(product);
   };
 
   return (
-    <Table title="Global Inventory" description="Real-time stock levels across all channels" recordCount={products.length} headers={['Product', 'Price', 'Status', 'Inventory', 'Actions']} headerBtn={{ label: isSyncing ? 'Syncing...' : 'Force Sync All', icon: <PiSparkleFill />, onClick: () => forceSyncAllProducts(), disabled: isSyncing }}>
+    <Table title="Global Inventory" description="Real-time stock levels across all channels" recordCount={products.length} headers={['Product', 'Price', 'Status', 'Inventory', 'Actions']} headerBtn={{ label: isSyncing.length > 0 ? 'Syncing...' : 'Force Sync All', icon: <PiSparkleFill />, onClick: () => forceSyncAllProducts(), disabled: isSyncing.length > 0 }}>
       {products.map((product) => {
         const stockStatus = getStockStatus(product.stock);
+        const disableSync = isSyncing.includes(product.sku);
 
         return (
           <tr key={product._id} className="group transition-all duration-300 hover:bg-white/5">
@@ -87,9 +88,9 @@ const ProductTable = ({ products, isSyncing }: Props) => {
                 <ActionButton icon={<Icons.Delete />} onClick={() => handleDelete(product._id)} variant="danger" title="Delete Product" />
 
                 {/* Primary Sync Button */}
-                <button disabled={isSyncing} onClick={() => syncModalHandler(product)} className="ml-2 flex items-center gap-2 rounded-lg bg-indigo-600 px-4 py-2.5 font-semibold text-white shadow-lg shadow-indigo-500/20 transition-all hover:-translate-y-0.5 hover:bg-indigo-500 hover:shadow-indigo-500/40 disabled:cursor-not-allowed disabled:opacity-50">
+                <button disabled={disableSync} onClick={() => syncModalHandler(product)} className="ml-2 flex items-center gap-2 rounded-lg bg-indigo-600 px-4 py-2.5 font-semibold text-white shadow-lg shadow-indigo-500/20 transition-all hover:-translate-y-0.5 hover:bg-indigo-500 hover:shadow-indigo-500/40 disabled:cursor-not-allowed disabled:opacity-50">
                   <Icons.Sync />
-                  <span>{isSyncing ? 'Syncing...' : 'Sync'}</span>
+                  <span>{disableSync ? 'Syncing...' : 'Sync'}</span>
                 </button>
               </div>
             </td>

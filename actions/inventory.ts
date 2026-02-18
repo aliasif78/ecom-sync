@@ -12,17 +12,18 @@ import InventoryLedger from '@/database/models/InventoryLedger';
 import mongoose from 'mongoose';
 
 // Constants
-import { DEF_LOC_ID, PLATFORMS } from '@/lib/globalConstants';
+import { DEF_LOC_ID, MUTEX_ALL, PLATFORMS } from '@/lib/globalConstants';
 
 // Utils
-import { getCurrentUser, setSyncMutex } from '@/lib/users';
+import { getCurrentUser, addSyncMutex, removeSyncMutex } from '@/lib/users';
 
 // Inngest
 import { inngest } from '@/lib/inngest/client';
 
-export const syncProductStock = async (productId: string, newStock: number, reason: string, platform: (typeof PLATFORMS)[number], description?: string) => {
+export const syncProductStock = async (productId: string, newStock: number, reason: string, platform: (typeof PLATFORMS)[number], sku: string, description?: string) => {
   const isProduction = process.env.NODE_ENV === 'production'; // 'development' locally, 'production' on Vercel
   let session = null;
+  let latestSku = sku;
 
   // 1. Centralized Auth
   const { success, user, message } = await getCurrentUser();
@@ -36,7 +37,7 @@ export const syncProductStock = async (productId: string, newStock: number, reas
 
   try {
     // 2. Check the mutex
-    if (user.isSyncing) {
+    if (user.isSyncing[0] === MUTEX_ALL || user.isSyncing.includes(latestSku)) {
       console.error(`🚩 SYNC_PRODUCT_STOCK_ERROR: User is already syncing`);
       return { success: false, error: 'A sync is already in progress. Please wait.' };
     }
@@ -69,6 +70,7 @@ export const syncProductStock = async (productId: string, newStock: number, reas
     // 7. Update Product Logic (Handle the Array!) 📦
     // We update the specific location.
     // If the location doesn't exist, we should push it (simplified here to update existing).
+    latestSku = product.sku;
     const locationIndex = product.inventoryByLocation.findIndex((inv: IInventoryLevel) => inv.locationId.toString() === DEF_LOC_ID);
 
     // Update existing location
@@ -89,19 +91,19 @@ export const syncProductStock = async (productId: string, newStock: number, reas
     if (session) await session.commitTransaction();
 
     // 13. Lock the mutex
-    await setSyncMutex(userId, true);
+    await addSyncMutex(userId, latestSku);
     isSyncLocked = true;
 
     // 14. Refresh UI (Critical) - This tells Next.js: "The data at /products is stale. Fetch it again."
     revalidatePath('/products');
 
     // 15. Fire the inngest sync function to update all actual real-world stores
-    await inngest.send({ name: 'inventory/stock.updated', data: { sku: product.sku, quantity: newStock, userId } });
+    await inngest.send({ name: 'inventory/stock.updated', data: { sku: latestSku, quantity: newStock, userId } }); // Don't blindly trust the FE SKU
 
     // 16. Return success
     return { success: true, data: JSON.parse(JSON.stringify(product)) }; // Next.js serialization safety
   } catch (error) {
-    if (isSyncLocked) await setSyncMutex(userId, false); // Release on error
+    if (isSyncLocked) await removeSyncMutex(userId, latestSku); // Release on error
     console.error('🚩 SYNC_PRODUCT_STOCK_ERROR:', error);
     return { success: false, error: 'Failed to sync product stock' };
   } finally {
@@ -123,7 +125,7 @@ export const forceSyncAllProducts = async () => {
 
   try {
     // 2. Check Mutex
-    if (user.isSyncing) {
+    if (user.isSyncing.length) {
       console.error(`🚩 FORCE_SYNC_ALL_PRODUCTS_ERROR: User is already syncing`);
       return { success: false, error: 'A sync is already in progress. Please wait.' };
     }
@@ -138,7 +140,7 @@ export const forceSyncAllProducts = async () => {
     if (!prodAndStoreExists[1]) return { success: false, error: 'No stores found' };
 
     // 6. Lock the mutex
-    await setSyncMutex(userId, true);
+    await addSyncMutex(userId, MUTEX_ALL);
     isSyncLocked = true;
 
     // 7. Update the UI
@@ -150,7 +152,7 @@ export const forceSyncAllProducts = async () => {
     // 9. Return success
     return { success: true, message: 'Synced all products across all stores' };
   } catch (error) {
-    if (isSyncLocked) await setSyncMutex(userId, false); // Release on error
+    if (isSyncLocked) await removeSyncMutex(userId, MUTEX_ALL); // Release on error
     console.error('🚩 FORCE_SYNC_ALL_PRODUCTS_ERROR:', error);
     return { success: false, error: 'Failed to force sync all products' };
   }

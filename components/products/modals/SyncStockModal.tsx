@@ -42,7 +42,7 @@ export default function SyncStockModal({ isOpen, onClose, product }: { isOpen: b
     setIsLoading(true);
 
     try {
-      const res = await syncProductStock(product._id, Number(newStock), reason, MANUAL, description);
+      const res = await syncProductStock(product._id, Number(newStock), reason, MANUAL, description, product.sku);
 
       // Error
       if (!res.success || res.error) {

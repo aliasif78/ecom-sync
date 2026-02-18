@@ -7,7 +7,7 @@ import { createAdminClient } from '../supabase/admin'; // For executing high-pri
 import { createClient } from '../supabase/server'; // For checking WHO is making the request
 
 // Constants
-import { VERIFIED, NOT_VERIFIED } from '../globalConstants';
+import { VERIFIED, NOT_VERIFIED, MUTEX_ALL } from '../globalConstants';
 
 // Helpers
 const getCurrentSbUser = async () => {
@@ -188,8 +188,26 @@ export const getCurrentUser = async () => {
   }
 };
 
-export const setSyncMutex = async (userId: string, status: boolean) => {
+export const addSyncMutex = async (userId: string, lockId: string) => {
+  // 1. Establish database connection
   await connectDB();
-  console.log((!status ? 'UN' : '') + 'LOCKING MUTEX 😶‍🌫️');
-  return await User.findByIdAndUpdate(userId, { isSyncing: status });
+
+  // 2. Determine the updated array state
+  // Allows individual products to be added after MUTEX_ALL, but that does not matter as removing MUTEX_ALL empties the whole array
+  const query = lockId === MUTEX_ALL ? { $set: { isSyncing: [MUTEX_ALL] } } : { $addToSet: { isSyncing: lockId } };
+
+  // 3. Update the user
+  return await User.findByIdAndUpdate(userId, query, { new: true });
+};
+
+export const removeSyncMutex = async (userId: string, unlockId: string) => {
+  // 1. Establish database connection
+  await connectDB();
+
+  // 2. Determine the updated array state
+  // Clear the whole array when the FORCE_SYNC_ALL completes
+  const query = unlockId === MUTEX_ALL ? { $set: { isSyncing: [] } } : { $pull: { isSyncing: unlockId } };
+
+  // 3. Update the user
+  return await User.findByIdAndUpdate(userId, query, { new: true });
 };
