@@ -98,8 +98,8 @@ const ProductTable = ({ products, isSyncing }: Props) => {
             <td className="px-8 py-5 text-right text-sm font-medium whitespace-nowrap">
               <div className="flex items-center justify-end gap-3">
                 <ActionButton icon={<Icons.History />} onClick={() => openHistoryModal(product)} title="View History" />
-                <ActionButton icon={<Icons.Edit />} onClick={() => openEditModal(product)} title="Edit Product" />
-                <ActionButton icon={<Icons.Delete />} onClick={() => handleDelete(product._id)} variant="danger" title="Delete Product" />
+                <ActionButton icon={<Icons.Edit />} onClick={() => openEditModal(product)} title="Edit Product" disabled={disableSync} />
+                <ActionButton icon={<Icons.Delete />} onClick={() => handleDelete(product._id)} variant="danger" title="Delete Product" disabled={disableSync} />
 
                 {/* Primary Sync Button */}
                 <button disabled={disableSync} onClick={() => syncModalHandler(product)} className="ml-2 flex items-center gap-2 rounded-lg bg-indigo-600 px-4 py-2.5 font-semibold text-white shadow-lg shadow-indigo-500/20 transition-all hover:-translate-y-0.5 hover:bg-indigo-500 hover:shadow-indigo-500/40 disabled:cursor-not-allowed disabled:opacity-50">

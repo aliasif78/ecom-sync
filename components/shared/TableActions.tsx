@@ -15,7 +15,7 @@ export const ActionButton = ({ variant = 'default', className, icon, ...props }:
   };
 
   return (
-    <button type="button" className={`${baseStyles} ${variants[variant]} ${className}`} {...props}>
+    <button type="button" className={`${baseStyles} ${variants[variant]} ${className} disabled:cursor-not-allowed disabled:opacity-50`} {...props}>
       {icon}
     </button>
   );

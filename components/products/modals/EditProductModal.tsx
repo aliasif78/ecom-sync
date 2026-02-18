@@ -11,13 +11,13 @@ import { ModalShell, ModalHeader, ModalInput, ModalFooter } from './Atoms';
 // Types
 import { ProductRow } from '@/types';
 
-export default function EditProductModal({ isOpen, onClose, product }: { isOpen: boolean; onClose: () => void; product: ProductRow }) {
+export default function EditProductModal({ isOpen, onClose, product, disallow }: { isOpen: boolean; onClose: () => void; product: ProductRow; disallow?: boolean }) {
   // States
   const [isLoading, setIsLoading] = useState(false);
   const [form, setForm] = useState({ name: product.name || '', price: product.price.toString() || '', image: product.image || '' });
 
   // Functions
-  const handleSubmit = () => runServerAction({ validate: () => !!(form.name && form.price && form.image), action: () => updateProduct({ _id: product._id, ...form, price: Number(form.price) }), setIsLoading, onSuccess: onClose, successMessage: 'Product updated!' });
+  const handleSubmit = () => runServerAction({ validate: () => !!(form.name && form.price && form.image), action: () => updateProduct({ _id: product._id, ...form, price: Number(form.price), disallow }), setIsLoading, onSuccess: onClose, successMessage: 'Product updated!' });
 
   return (
     <ModalShell isOpen={isOpen}>

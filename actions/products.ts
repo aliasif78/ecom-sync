@@ -16,7 +16,8 @@ export async function addProduct(data: { name: string; price: number; image: str
 // ---------------------------------------------------------
 // 2. Delete Product
 // ---------------------------------------------------------
-export async function deleteProduct(_id: string) {
+export async function deleteProduct(_id: string, disallow?: boolean) {
+  if (disallow) return { success: false, message: 'You are not allowed to delete this product in its current state' };
   if (!_id) return { success: false, message: 'Missing required fields' };
   return authGuard('DELETE_PRODUCT', '/products', (userId) => deleteProductById({ userId, _id }));
 }
@@ -24,7 +25,8 @@ export async function deleteProduct(_id: string) {
 // ---------------------------------------------------------
 // 3. Update Product
 // ---------------------------------------------------------
-export async function updateProduct(data: { _id: string; name: string; price: number; image: string }) {
+export async function updateProduct(data: { _id: string; name: string; price: number; image: string; disallow?: boolean }) {
+  if (data.disallow) return { success: false, message: 'You are not allowed to update this product in its current state' };
   if (!data._id || !data.name || data.price === undefined || !data.image) return { success: false, message: 'Missing required fields' };
   return authGuard('UPDATE_PRODUCT', '/products', (userId) => updateProductById({ userId, ...data }));
 }
