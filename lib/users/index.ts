@@ -1,6 +1,7 @@
 // Database
-import User from '@/database/models/User';
 import { connectDB } from '@/database/mongoose';
+import User from '@/database/models/User';
+import Product from '@/database/models/Product';
 
 // Supabase
 import { createAdminClient } from '../supabase/admin'; // For executing high-privilege commands
@@ -193,20 +194,26 @@ export const addSyncMutex = async (userId: string, lockId: string) => {
   await connectDB();
 
   // 2. Determine the updated array state
-  // Allows individual products to be added after MUTEX_ALL, but that does not matter as removing MUTEX_ALL empties the whole array
-  const query = lockId === MUTEX_ALL ? { $set: { isSyncing: [MUTEX_ALL] } } : { $addToSet: { isSyncing: lockId } };
+  // An individual product needs to be synced
+  if (lockId !== MUTEX_ALL) return await User.findByIdAndUpdate(userId, { $addToSet: { isSyncing: lockId } }, { new: true });
 
-  // 3. Update the user
-  return await User.findByIdAndUpdate(userId, query, { new: true });
+  // All products need to be synced
+  // A. Fetch all the product SKUs belonging to this user from the database
+  const products = await Product.find({ userId }).select('sku');
+  if (!products.length) return;
+
+  const productSKUs = products.map((product) => product.sku);
+
+  // B. Add all of them to the isSyncing array
+  return await User.findByIdAndUpdate(userId, { $addToSet: { isSyncing: { $each: productSKUs } } }, { new: true });
 };
 
 export const removeSyncMutex = async (userId: string, unlockId: string) => {
   // 1. Establish database connection
   await connectDB();
 
-  // 2. Determine the updated array state
-  // Clear the whole array when the FORCE_SYNC_ALL completes
-  const query = unlockId === MUTEX_ALL ? { $set: { isSyncing: [] } } : { $pull: { isSyncing: unlockId } };
+  // 2. Pull the product SKU out of the isSyncing array
+  const query = { $pull: { isSyncing: unlockId } };
 
   // 3. Update the user
   return await User.findByIdAndUpdate(userId, query, { new: true });

@@ -37,7 +37,7 @@ export const syncProductStock = async (productId: string, newStock: number, reas
 
   try {
     // 2. Check the mutex
-    if (user.isSyncing[0] === MUTEX_ALL || user.isSyncing.includes(latestSku)) {
+    if (user.isSyncing.includes(latestSku)) {
       console.error(`🚩 SYNC_PRODUCT_STOCK_ERROR: User is already syncing`);
       return { success: false, error: 'A sync is already in progress. Please wait.' };
     }
@@ -116,7 +116,6 @@ export const forceSyncAllProducts = async () => {
   // 1. Get the current user
   const { success, user, message } = await getCurrentUser();
   const userId = user?._id.toString() || '';
-  let isSyncLocked = false;
 
   if (!success || !user) {
     console.error(`🚩 FORCE_SYNC_ALL_PRODUCTS_ERROR: User not found`);
@@ -141,7 +140,6 @@ export const forceSyncAllProducts = async () => {
 
     // 6. Lock the mutex
     await addSyncMutex(userId, MUTEX_ALL);
-    isSyncLocked = true;
 
     // 7. Update the UI
     revalidatePath('/products');
@@ -152,7 +150,6 @@ export const forceSyncAllProducts = async () => {
     // 9. Return success
     return { success: true, message: 'Synced all products across all stores' };
   } catch (error) {
-    if (isSyncLocked) await removeSyncMutex(userId, MUTEX_ALL); // Release on error
     console.error('🚩 FORCE_SYNC_ALL_PRODUCTS_ERROR:', error);
     return { success: false, error: 'Failed to force sync all products' };
   }

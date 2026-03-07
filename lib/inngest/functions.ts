@@ -11,7 +11,7 @@ import { getAdapter } from '@/lib/adapters';
 
 // Types
 import { ProductRow } from '@/types';
-import { EPlatform, MUTEX_ALL } from '../globalConstants';
+import { EPlatform } from '../globalConstants';
 
 // Utils
 import { removeSyncMutex } from '../users';
@@ -53,7 +53,7 @@ export const syncStockToStores = inngest.createFunction(
 
   async ({ event, step }) => {
     // 1. Extract data
-    const { sku, quantity, userId, isForced } = event.data;
+    const { sku, quantity, userId } = event.data;
 
     // 2. Validation
     if (!userId || !sku || quantity === undefined) return { error: 'Missing SKU or Quantity' };
@@ -99,7 +99,7 @@ export const syncStockToStores = inngest.createFunction(
       throw new Error('ERROR IN SYNCING SINGLE PRODUCT');
     } finally {
       // Release the mutex
-      if (!isForced) await step.run('release-lock', () => removeSyncMutex(userId, sku));
+      await step.run('release-lock', () => removeSyncMutex(userId, sku));
 
       // 📣 Tell the UI the work is done - We use the userId as the channel name so we only notify THIS user
       await pusherServer.trigger(userId, 'sync-finished', { message: `[${sku}]'s inventory sync complete.` });
@@ -125,7 +125,7 @@ export const forceSyncAllStores = inngest.createFunction(
       // 4. Reuse the individual product sync function for all products
       // We loop through products and INVOKE the sync function for each.
       // We use Promise.all to run them in parallel (up to the concurrency limits you set).
-      await Promise.all(products.map((p: ProductRow) => step.invoke(`sync-product-${p.sku}`, { function: syncStockToStores, data: { sku: p.sku, quantity: p.stock, userId, isForced: true } })));
+      await Promise.all(products.map((p: ProductRow) => step.invoke(`sync-product-${p.sku}`, { function: syncStockToStores, data: { sku: p.sku, quantity: p.stock, userId } })));
 
       // 5. Return final results
       return { message: 'Force Sync Complete', productCount: products.length };
@@ -133,9 +133,7 @@ export const forceSyncAllStores = inngest.createFunction(
       console.error(error);
       throw new Error('ERROR IN FORCE SYNCING ALL PRODUCTS');
     } finally {
-      // Release the mutex
-      await step.run('release-lock', () => removeSyncMutex(userId, MUTEX_ALL));
-
+      // The isSyncing array is automatically emptied at this point as each product will be removed from it one by one.
       // 📣 Tell the UI the work is done - We use the userId as the channel name so we only notify THIS user
       await pusherServer.trigger(userId, 'sync-finished', { message: 'Inventory sync complete!' });
     }
