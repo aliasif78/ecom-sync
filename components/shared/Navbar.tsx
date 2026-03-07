@@ -8,7 +8,7 @@ import { usePathname } from 'next/navigation';
 import { User } from '@supabase/supabase-js';
 
 // Components
-import LogoutButton from './auth/LogoutButton';
+import LogoutButton from '../auth/LogoutButton';
 
 // Interfaces
 interface NavbarProps {
@@ -37,7 +37,7 @@ export default function Navbar({ user }: NavbarProps) {
           {/* 2. Middle Navigation (Only visible if logged in) */}
           {user && (
             <div className="hidden items-center gap-1 md:flex">
-              {['products', 'inventory', 'orders'].map((path) => (
+              {['products', 'stores'].map((path) => (
                 <NavLink key={path} href={'/' + path} active={pathname === '/' + path}>
                   {path.charAt(0).toUpperCase() + path.slice(1)}
                 </NavLink>

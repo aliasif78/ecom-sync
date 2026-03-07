@@ -1,13 +1,14 @@
 // Database
-import User from '@/database/models/User';
 import { connectDB } from '@/database/mongoose';
+import User from '@/database/models/User';
+import Product from '@/database/models/Product';
 
 // Supabase
 import { createAdminClient } from '../supabase/admin'; // For executing high-privilege commands
 import { createClient } from '../supabase/server'; // For checking WHO is making the request
 
 // Constants
-import { VERIFIED, NOT_VERIFIED } from '../globalConstants';
+import { VERIFIED, NOT_VERIFIED, MUTEX_ALL } from '../globalConstants';
 
 // Helpers
 const getCurrentSbUser = async () => {
@@ -186,4 +187,34 @@ export const getCurrentUser = async () => {
     console.error(error);
     return { success: false, message: 'Failed to get current user' };
   }
+};
+
+export const addSyncMutex = async (userId: string, lockId: string) => {
+  // 1. Establish database connection
+  await connectDB();
+
+  // 2. Determine the updated array state
+  // An individual product needs to be synced
+  if (lockId !== MUTEX_ALL) return await User.findByIdAndUpdate(userId, { $addToSet: { isSyncing: lockId } }, { new: true });
+
+  // All products need to be synced
+  // A. Fetch all the product SKUs belonging to this user from the database
+  const products = await Product.find({ userId }).select('sku');
+  if (!products.length) return;
+
+  const productSKUs = products.map((product) => product.sku);
+
+  // B. Add all of them to the isSyncing array
+  return await User.findByIdAndUpdate(userId, { $addToSet: { isSyncing: { $each: productSKUs } } }, { new: true });
+};
+
+export const removeSyncMutex = async (userId: string, unlockId: string) => {
+  // 1. Establish database connection
+  await connectDB();
+
+  // 2. Pull the product SKU out of the isSyncing array
+  const query = { $pull: { isSyncing: unlockId } };
+
+  // 3. Update the user
+  return await User.findByIdAndUpdate(userId, query, { new: true });
 };

@@ -81,7 +81,7 @@ export const ProductHistoryModal = ({ isOpen, onClose, selectedProduct }: Produc
 
       const res = await getProductHistory(selectedProduct._id);
       if (res.success && res.data) setHistory(res.data);
-      else toast.error(res.message);
+      else if (res.message) toast.error(res.message);
 
       setIsLoading(false);
     };

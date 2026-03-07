@@ -3,6 +3,14 @@ export const AMAZON = 'AMAZON';
 export const WOOCOMMERCE = 'WOOCOMMERCE';
 export const MANUAL = 'MANUAL';
 export const PLATFORMS = [SHOPIFY, AMAZON, WOOCOMMERCE, MANUAL];
+
+export enum EPlatform {
+  SHOPIFY = 'SHOPIFY',
+  AMAZON = 'AMAZON',
+  WOOCOMMERCE = 'WOOCOMMERCE',
+  MANUAL = 'MANUAL',
+}
+
 export const DEF_LOC_ID = 'WAREHOUSE_MAIN';
 
 // Role
@@ -14,3 +22,6 @@ export const ROLES = [USER, ADMIN];
 export const VERIFIED = 'Verified';
 export const NOT_VERIFIED = 'Not Verified';
 export const VERIFICATION = [VERIFIED, NOT_VERIFIED];
+
+// Sync Mutex
+export const MUTEX_ALL = 'ALL';
