@@ -12,12 +12,15 @@ const KEY_PREFIX = 'products';
 
 // Initialize S3 Client
 const s3Client = new S3Client({
-  region: process.env.AWS_REGION!,
+  region: process.env.NEXT_PUBLIC_AWS_REGION!,
 
   credentials: {
     accessKeyId: process.env.AWS_ACCESS_KEY_ID!,
     secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY!,
   },
+
+  // Tell the SDK to stop calculating checksums for empty presigned payloads
+  requestChecksumCalculation: 'WHEN_REQUIRED',
 });
 
 export async function getPresignedUploadUrl(fileName: string, fileType: string, fileSize: number) {
@@ -30,14 +33,20 @@ export async function getPresignedUploadUrl(fileName: string, fileType: string, 
 
   // 3. Create the command
   const command = new PutObjectCommand({
-    Bucket: process.env.AWS_S3_BUCKET_NAME!,
+    Bucket: process.env.NEXT_PUBLIC_AWS_S3_BUCKET_NAME!,
     Key: `${KEY_PREFIX}/${uniqueFileName}`,
     ContentType: fileType,
   });
 
   // 4. Generate the signed URL (Valid for 60 seconds)
   try {
-    const url = await getSignedUrl(s3Client, command, { expiresIn: 60 });
+    const url = await getSignedUrl(s3Client, command, {
+      expiresIn: 60,
+
+      // Tell AWS to only care about the Host and Content-Type
+      signableHeaders: new Set(['host', 'content-type']),
+    });
+
     return { success: true, url, resourceKey: `${KEY_PREFIX}/${uniqueFileName}` };
   } catch (error) {
     console.error('S3 Signing Error:', error);

@@ -14,6 +14,8 @@ import { ProductRow } from '@/types';
 // Icons
 import { PiSparkleFill } from 'react-icons/pi';
 import { forceSyncAllProducts } from '@/actions/inventory';
+import Image from 'next/image';
+import { toast } from 'sonner';
 
 // Interfaces
 interface Props {
@@ -43,7 +45,10 @@ const ProductTable = ({ products, isSyncing }: Props) => {
 
   // Functions
   const handleDelete = async (id: string) => {
-    if (confirm('Are you sure that you want to delete this product?')) await deleteProduct(id);
+    if (confirm('Are you sure that you want to delete this product?')) {
+      await deleteProduct(id);
+      toast.success('Product deleted successfully!');
+    } else toast.error('Error deleting product.');
   };
 
   const syncModalHandler = (product: ProductRow) => {
@@ -65,7 +70,7 @@ const ProductTable = ({ products, isSyncing }: Props) => {
             <td className="px-8 py-5 whitespace-nowrap">
               <div className="flex items-center gap-4">
                 <div className="relative h-14 w-14 shrink-0 overflow-hidden rounded-xl border border-white/10 bg-slate-800">
-                  <img src={product.image} alt={product.name} className="h-full w-full object-cover" />
+                  <Image src={product.image} alt={product.name} fill sizes="(max-width: 768px) 100vw, 300px" className="rounded-lg object-cover" />
                 </div>
                 <div>
                   <div className="text-base font-semibold text-slate-100">{product.name}</div>

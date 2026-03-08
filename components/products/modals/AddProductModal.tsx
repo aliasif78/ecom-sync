@@ -7,6 +7,7 @@ import { runServerAction } from '@/lib/utils';
 
 // Components
 import { ModalShell, ModalHeader, ModalInput, ModalFooter } from './Atoms';
+import { ProductImageUpload } from '../ProductImageUpload';
 
 export default function AddProductModal({ isOpen, onClose }: { isOpen: boolean; onClose: () => void }) {
   // States
@@ -29,7 +30,7 @@ export default function AddProductModal({ isOpen, onClose }: { isOpen: boolean; 
           <ModalInput label="Price" name="price" type="number" prefix="$" value={form.price} onChange={handleChange} suffix="USD" />
         </div>
 
-        <ModalInput label="Image URL" name="image" placeholder="https://..." value={form.image} onChange={handleChange} />
+        <ProductImageUpload value={form.image} onChange={(url) => setForm({ ...form, image: url })} />
         <ModalInput label="Initial Stock" name="stock" type="number" value={form.stock} onChange={handleChange} suffix="units" />
       </div>
 
