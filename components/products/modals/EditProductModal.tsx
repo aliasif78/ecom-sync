@@ -7,6 +7,7 @@ import { runServerAction } from '@/lib/utils';
 
 // Components
 import { ModalShell, ModalHeader, ModalInput, ModalFooter } from './Atoms';
+import { ProductImageUpload } from '../ProductImageUpload';
 
 // Types
 import { ProductRow } from '@/types';
@@ -26,7 +27,7 @@ export default function EditProductModal({ isOpen, onClose, product, disallow }:
       <div className="space-y-4">
         <ModalInput label="Product Name" name="name" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
         <ModalInput label="Price" name="price" type="number" min={0} value={form.price} onChange={(e) => setForm({ ...form, price: e.target.value })} suffix="USD" />
-        <ModalInput label="Image URL" name="image" value={form.image} onChange={(e) => setForm({ ...form, image: e.target.value })} />
+        <ProductImageUpload value={form.image} onChange={(url) => setForm({ ...form, image: url })} />
       </div>
 
       <ModalFooter onCancel={onClose} onConfirm={handleSubmit} isLoading={isLoading} confirmText="Save Changes" />

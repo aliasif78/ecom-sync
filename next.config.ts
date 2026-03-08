@@ -21,6 +21,13 @@ const nextConfig: NextConfig = {
         protocol: 'https',
         hostname: '*.googleusercontent.com', // 👈 Catch-all for other Google subdomains
       },
+
+      {
+        protocol: 'https',
+        hostname: 'ecomsync-assets.s3.ap-south-1.amazonaws.com',
+        port: '',
+        pathname: '/**', // Allows all files inside this bucket
+      },
     ],
   },
 };
