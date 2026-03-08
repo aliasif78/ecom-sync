@@ -7,6 +7,12 @@ import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 // Other Dependencies
 import { v4 as uuidv4 } from 'uuid';
 
+// PostHog
+import PostHogClient from '@/lib/posthog';
+
+// Auth
+import { getCurrentUser } from '@/lib/users';
+
 // Constants
 const KEY_PREFIX = 'products';
 
@@ -47,6 +53,22 @@ export async function getPresignedUploadUrl(fileName: string, fileType: string, 
       signableHeaders: new Set(['host', 'content-type']),
     });
 
+    // 5. Get the current user Id
+    const { user } = await getCurrentUser();
+
+    // 6. PostHog Tracking
+    const ph = PostHogClient();
+
+    ph.capture({
+      distinctId: user?._id.toString(),
+      event: 's3_upload_initiated',
+      properties: { fileType, bucket: process.env.NEXT_PUBLIC_AWS_S3_BUCKET_NAME },
+    });
+
+    // Ensures the event is sent before the server action terminates
+    await ph.shutdown();
+
+    // Success Respone
     return { success: true, url, resourceKey: `${KEY_PREFIX}/${uniqueFileName}` };
   } catch (error) {
     console.error('S3 Signing Error:', error);

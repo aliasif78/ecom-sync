@@ -11,6 +11,10 @@ import { createClient } from '@/lib/supabase/server';
 // Components
 import Navbar from '@/components/shared/Navbar';
 
+// Providers
+import { PostHogProvider } from '@/components/providers/PostHogProvider';
+import PostHogIdentify from '@/components/providers/PostHogIdentify';
+
 // Styles
 import './globals.css';
 
@@ -30,11 +34,16 @@ export default async function RootLayout({ children }: Readonly<{ children: Reac
   return (
     <html lang="en">
       <body className={`${geistSans.variable} ${geistMono.variable} relative min-h-screen bg-zinc-950 font-sans text-slate-50 antialiased`} suppressHydrationWarning>
-        {/* ✅ The Navbar sits here. It decides internally whether to show up. */}
-        <Navbar user={user} />
+        <PostHogProvider>
+          {/* 🔥 This bridges the Server User to Client PostHog */}
+          <PostHogIdentify user={user} />
 
-        <main className="min-h-screen bg-zinc-950">{children}</main>
-        <Toaster richColors position="top-center" />
+          {/* ✅ The Navbar sits here. It decides internally whether to show up. */}
+          <Navbar user={user} />
+
+          <main className="min-h-screen bg-zinc-950">{children}</main>
+          <Toaster richColors position="top-center" />
+        </PostHogProvider>
       </body>
     </html>
   );
