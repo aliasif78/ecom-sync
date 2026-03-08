@@ -138,11 +138,14 @@ export async function deleteProductById({ _id, userId }: { _id: string; userId: 
     // 2. Connect to the DB
     await connectDB();
 
-    // 3. Delete product
-    const deletedProduct = await Product.findOneAndDelete({ _id, userId: new Types.ObjectId(userId) });
-    if (!deletedProduct) return { success: false, message: 'Product not found' };
+    // 3. Find the product first (Our regex hook ensures this won't find already-archived items)
+    const product = await Product.findOne({ _id, userId: new Types.ObjectId(userId) });
+    if (!product) return { success: false, message: 'Product not found or already deleted' };
 
-    // 4. Return product
+    // 4. Trigger the Soft Delete instance method
+    await product.softDelete();
+
+    // 5. Success Response
     return { success: true, message: 'Product deleted successfully!' };
   } catch (error) {
     console.error('🚩 DELETE_PRODUCT_ERROR:', error);

@@ -18,7 +18,7 @@
 // ==========================================
 
 // Dependencies
-import { Schema, models, model, Model, Document, Types } from 'mongoose';
+import { Schema, models, model, Model, Document, Types, Query } from 'mongoose';
 
 // Constants
 import { SHOPIFY, WOOCOMMERCE, AMAZON } from '@/lib/globalConstants';
@@ -59,8 +59,13 @@ export interface IProduct extends Document {
   inventoryByLocation: IInventoryLevel[];
   version: number;
 
+  // Status
+  isArchived: boolean;
+  archivedAt?: Date;
+
   // Methods
   updateLocationStock(locationId: string, quantity: number): Promise<void>;
+  softDelete(): Promise<void>;
 
   // Virtuals
   readonly isSyncing: boolean;
@@ -114,6 +119,10 @@ const ProductSchema = new Schema<IProduct>(
     stock: { type: Number, required: true, index: true, default: 0 }, // A cached sum of all locations for fast sorting
     inventoryByLocation: [{ _id: false, locationId: { type: String, required: true }, quantity: { type: Number, default: 0 } }], // We may have different warehouses
     version: { type: Number, default: 0 }, // To prevent concurrent updates by > 1 Admins
+
+    // 🗑️ Soft Delete Flags
+    isArchived: { type: Boolean, default: false, index: true },
+    archivedAt: { type: Date },
   },
 
   // Enable timestamps
@@ -146,6 +155,13 @@ ProductSchema.pre('save', function () {
   this.stock = total;
 });
 
+// Hide archived products from all standard queries automatically
+ProductSchema.pre(/^find/, function (this: Query<unknown, IProduct>) {
+  // Check if the query is already explicitly asking for archived items
+  // If not, we force it to only return active items.
+  if (this.getFilter().isArchived === undefined) this.where({ isArchived: { $ne: true } });
+});
+
 // ==========================================
 // 🔧 METHODS (Instance Logic)
 // ==========================================
@@ -161,6 +177,12 @@ ProductSchema.methods.updateLocationStock = async function (locationId: string, 
   await this.save();
 
   // TODO: Implement retry logic for VersionError
+};
+
+ProductSchema.methods.softDelete = async function () {
+  this.isArchived = true;
+  this.archivedAt = new Date();
+  await this.save();
 };
 
 // ==========================================
