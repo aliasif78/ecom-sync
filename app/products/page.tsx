@@ -10,8 +10,8 @@ import ProductTable from '@/components/products/ProductTable';
 
 const Page = async () => {
   // API
-  const products = await getProducts();
   const { user } = await getCurrentUser();
+  const products = await getProducts(user?._id.toString());
 
   // Constants
   const isSyncing = user?.isSyncing || [];

@@ -14,7 +14,7 @@ import { trackEvent } from '../posthog/helpers';
 // GET Products
 // This exists here, only because the component using it is a server component
 // If it were a client component, we would use server actions
-export async function getProducts() {
+export async function getProducts(userId: string) {
   try {
     // 1. Connect to the DB
     await connectDB();
@@ -22,7 +22,9 @@ export async function getProducts() {
     // 2. Fetch products
     // lean() is 5-10x faster + gives the raw JSON data + returns POJO instead of Mongoose Docs
     // Sort by newest first (standard UX)
-    const products = await Product.find().sort({ createdAt: -1 }).lean();
+    const products = await Product.find({ userId: new Types.ObjectId(userId) })
+      .sort({ createdAt: -1 })
+      .lean();
 
     // 3. Return products
     // Manually serialize ObjectId and Dates - this prevents the "Server to Client" serialization error

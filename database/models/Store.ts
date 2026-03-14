@@ -97,6 +97,10 @@ StoreSchema.index({ userId: 1, platform: 1 });
 // 2. User cannot have two stores with the same name (UX Protection)
 StoreSchema.index({ userId: 1, name: 1 }, { unique: true });
 
+// 3. Prevent users from adding the same exact store URL twice.
+// The 'partialFilterExpression' ensures this ONLY applies to platforms (like Shopify/Woo) that actually use a storeUrl.
+StoreSchema.index({ userId: 1, 'config.storeUrl': 1 }, { unique: true, partialFilterExpression: { 'config.storeUrl': { $type: 'string' } } });
+
 // Others, done inside the model definition using the 'index' or 'sparse' options
 
 const Store = models.Store || model<IStore>('Store', StoreSchema);
