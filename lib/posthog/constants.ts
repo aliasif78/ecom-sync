@@ -14,8 +14,12 @@ export const PRODUCT_UPDATE_FAILED = 'product_update_failed';
 // Inventory
 export const INVENTORY_ADJUSTED = 'inventory_adjusted';
 export const INVENTORY_ADJUSTMENT_FAILED = 'inventory_adjustment_failed';
+
+export const FORCE_SYNC_ALL_PRODUCTS_CLICKED = 'force_sync_all_products_clicked';
 export const FORCE_SYNC_ALL_PRODUCTS = 'force_sync_all_products';
 export const FORCE_SYNC_ALL_PRODUCTS_FAILED = 'force_sync_all_products_failed';
+
+export const SYNC_PRODUCT_CLICKED = 'sync_product_clicked';
 export const SYNC_PRODUCT = 'sync_product';
 export const SYNC_PRODUCT_FAILED = 'sync_product_failed';
 

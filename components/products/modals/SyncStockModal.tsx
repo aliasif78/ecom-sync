@@ -1,8 +1,9 @@
 // React
 import { useState } from 'react';
 
-// Shadcn
+// Dependencies
 import { toast } from 'sonner';
+import posthog from 'posthog-js';
 
 // Server Actions
 import { syncProductStock } from '@/actions/inventory';
@@ -15,6 +16,7 @@ import { ProductRow, InventoryReason } from '@/types';
 
 // Constants
 import { MANUAL } from '@/lib/globalConstants';
+import { SYNC_PRODUCT_CLICKED } from '@/lib/posthog/constants';
 
 export default function SyncStockModal({ isOpen, onClose, product }: { isOpen: boolean; onClose: () => void; product: ProductRow }) {
   // States
@@ -27,14 +29,17 @@ export default function SyncStockModal({ isOpen, onClose, product }: { isOpen: b
 
   // Functions
   const handleSync = async () => {
-    // Safety Checks
-    if (!newStock || Number(newStock) < 0) {
-      toast.error('Please enter a valid stock quantity');
-      return;
-    }
+    // Record a PostHog event instantly
+    posthog.capture(SYNC_PRODUCT_CLICKED, { current_route: '/products' });
 
-    if (Number(newStock) === product.stock) {
-      toast.error('New stock is the same as current stock');
+    let message;
+
+    // Safety Checks
+    if (!newStock || Number(newStock) < 0) message = 'Please enter a valid stock quantity';
+    if (Number(newStock) === product.stock) message = 'New stock is the same as current stock';
+
+    if (message) {
+      toast.error(message);
       return;
     }
 

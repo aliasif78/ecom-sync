@@ -13,9 +13,19 @@ import { ProductRow } from '@/types';
 
 // Icons
 import { PiSparkleFill } from 'react-icons/pi';
+
+// Server Actions
 import { forceSyncAllProducts } from '@/actions/inventory';
+
+// Next Js
 import Image from 'next/image';
+
+// Dependencies
 import { toast } from 'sonner';
+import posthog from 'posthog-js';
+
+// Constants
+import { FORCE_SYNC_ALL_PRODUCTS_CLICKED } from '@/lib/posthog/constants';
 
 // Interfaces
 interface Props {
@@ -55,11 +65,16 @@ const ProductTable = ({ products, isSyncing }: Props) => {
     if (!isSyncing.includes(product.sku)) openSyncModal(product);
   };
 
+  const handleForceSyncAll = () => {
+    posthog.capture(FORCE_SYNC_ALL_PRODUCTS_CLICKED, { current_route: '/products' });
+    forceSyncAllProducts();
+  };
+
   // Constants
   const IS_SYNCING_ANY = isSyncing.length > 0;
 
   return (
-    <Table title="Global Inventory" description="Real-time stock levels across all channels" recordCount={products.length} headers={['Product', 'Price', 'Status', 'Inventory', 'Actions']} headerBtn={{ label: IS_SYNCING_ANY ? 'Syncing...' : 'Force Sync All', icon: IS_SYNCING_ANY ? <Spinner spin /> : <PiSparkleFill />, onClick: () => forceSyncAllProducts(), disabled: IS_SYNCING_ANY }}>
+    <Table title="Global Inventory" description="Real-time stock levels across all channels" recordCount={products.length} headers={['Product', 'Price', 'Status', 'Inventory', 'Actions']} headerBtn={{ label: IS_SYNCING_ANY ? 'Syncing...' : 'Force Sync All', icon: IS_SYNCING_ANY ? <Spinner spin /> : <PiSparkleFill />, onClick: () => handleForceSyncAll(), disabled: IS_SYNCING_ANY }}>
       {products.map((product) => {
         const stockStatus = getStockStatus(product.stock);
         const disableSync = isSyncing.includes(product.sku);
