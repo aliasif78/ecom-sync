@@ -34,12 +34,15 @@ export const STORE_DISCONNECTION_FAILED = 'store_disconnection_failed';
 export const STORE_SYNC_ENABLED = 'store_sync_enabled';
 export const STORE_SYNC_DISABLED = 'store_sync_disabled';
 
-// Users
+// Users & Auth
 export const USER_LOGGED_IN = 'user_logged_in';
 export const USER_LOGGED_OUT = 'user_logged_out';
+
 export const USER_REGISTERED = 'user_registered';
 export const USER_REGISTERED_FAILED = 'user_registered_failed';
+
 export const USER_DELETED = 'user_deleted';
 export const USER_DELETED_FAILED = 'user_deleted_failed';
+
 export const USER_UPDATED = 'user_updated';
 export const USER_UPDATE_FAILED = 'user_update_failed';
