@@ -13,7 +13,7 @@ import mongoose from 'mongoose';
 
 // Constants
 import { DEF_LOC_ID, MUTEX_ALL, PLATFORMS } from '@/lib/globalConstants';
-import { FORCE_SYNC_ALL_PRODUCTS, FORCE_SYNC_ALL_PRODUCTS_FAILED } from '@/lib/posthog/constants';
+import { FORCE_SYNC_ALL_PRODUCTS, FORCE_SYNC_ALL_PRODUCTS_FAILED, SYNC_PRODUCT, SYNC_PRODUCT_FAILED } from '@/lib/posthog/constants';
 
 // Utils & Helpers
 import { getCurrentUser, addSyncMutex, removeSyncMutex } from '@/lib/users';
@@ -102,12 +102,23 @@ export const syncProductStock = async (productId: string, newStock: number, reas
     // 15. Fire the inngest sync function to update all actual real-world stores
     await inngest.send({ name: 'inventory/stock.updated', data: { sku: latestSku, quantity: newStock, userId } }); // Don't blindly trust the FE SKU
 
-    // 16. Return success
+    // 16. Track the event in PostHog
+    trackEvent(userId, SYNC_PRODUCT, { sku: latestSku, quantity: newStock, productId });
+
+    // 17. Return success
     return { success: true, data: JSON.parse(JSON.stringify(product)) }; // Next.js serialization safety
   } catch (error) {
-    if (isSyncLocked) await removeSyncMutex(userId, latestSku); // Release on error
     console.error('🚩 SYNC_PRODUCT_STOCK_ERROR:', error);
-    return { success: false, error: 'Failed to sync product stock' };
+    const message = 'Failed to sync product stock';
+
+    // 1. Release mutex
+    if (isSyncLocked) await removeSyncMutex(userId, latestSku);
+
+    // 2. Track the event in PostHog
+    trackEvent(userId, SYNC_PRODUCT_FAILED, { productId, error: message });
+
+    // 3. Error response
+    return { success: false, error: message };
   } finally {
     // 16. End Session
     if (session) session.endSession();

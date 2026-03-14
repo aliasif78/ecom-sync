@@ -16,6 +16,8 @@ export const INVENTORY_ADJUSTED = 'inventory_adjusted';
 export const INVENTORY_ADJUSTMENT_FAILED = 'inventory_adjustment_failed';
 export const FORCE_SYNC_ALL_PRODUCTS = 'force_sync_all_products';
 export const FORCE_SYNC_ALL_PRODUCTS_FAILED = 'force_sync_all_products_failed';
+export const SYNC_PRODUCT = 'sync_product';
+export const SYNC_PRODUCT_FAILED = 'sync_product_failed';
 
 // Stores
 export const STORE_CONNECTED = 'store_connected';
