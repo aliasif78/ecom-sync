@@ -8,7 +8,7 @@ import { connectDB } from '@/database/mongoose';
 
 // Constants
 import { EPlatform } from '@/lib/globalConstants';
-import { STORE_ADDED, STORE_ADD_FAILED } from '../posthog/constants';
+import { STORE_ADDED, STORE_ADD_FAILED, STORE_DELETED, STORE_DELETE_FAILED } from '../posthog/constants';
 
 // Utils & Helpers
 import { getKeyPattern, isDuplicateError } from '@/lib/utils';
@@ -113,11 +113,20 @@ export async function deleteStoreById({ storeId, userId }: { storeId: string; us
     const result = await Store.deleteOne({ _id: new Types.ObjectId(storeId), userId: new Types.ObjectId(userId) });
     if (!result.deletedCount) return { success: false, message: 'Store not found or access denied.' };
 
-    // 3. Return success
+    // 3. Track the event in PostHog
+    trackEvent(userId, STORE_DELETED, { storeId });
+
+    // 4. Return success
     return { success: true, message: 'Store deleted successfully!' };
   } catch (error) {
     console.error('🚩 DELETE_STORE_ERROR:', error);
-    return { success: false, message: 'Failed to delete store.' };
+    const message = 'Failed to delete store.';
+
+    // 1. Post Hog error tracking
+    trackEvent(userId, STORE_DELETE_FAILED, { error: message });
+
+    // 2. Error response
+    return { success: false, message };
   }
 }
 

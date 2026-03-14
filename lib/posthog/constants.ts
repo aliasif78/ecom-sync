@@ -22,10 +22,15 @@ export const SYNC_PRODUCT_FAILED = 'sync_product_failed';
 // Stores
 export const STORE_ADDED = 'store_added';
 export const STORE_ADD_FAILED = 'store_add_failed';
+
+export const STORE_DELETED = 'store_deleted';
+export const STORE_DELETE_FAILED = 'store_delete_failed';
+
 export const STORE_CONNECTED = 'store_connected';
 export const STORE_CONNECTION_FAILED = 'store_connection_failed';
 export const STORE_DISCONNECTED = 'store_disconnected';
 export const STORE_DISCONNECTION_FAILED = 'store_disconnection_failed';
+
 export const STORE_SYNC_ENABLED = 'store_sync_enabled';
 export const STORE_SYNC_DISABLED = 'store_sync_disabled';
 
