@@ -5,7 +5,7 @@ import { Types } from 'mongoose';
 
 // Constants
 import { DEF_LOC_ID } from '../globalConstants';
-import { PRODUCT_CREATED, PRODUCT_CREATION_FAILED, PRODUCT_ARCHIVED, PRODUCT_ARCHIVE_FAILED } from '@/lib/posthog/constants';
+import { PRODUCT_CREATED, PRODUCT_CREATION_FAILED, PRODUCT_ARCHIVED, PRODUCT_ARCHIVE_FAILED, PRODUCT_UPDATED, PRODUCT_UPDATE_FAILED } from '@/lib/posthog/constants';
 
 // Utils & Helpers
 import { isDuplicateError } from '../utils';
@@ -128,11 +128,20 @@ export async function updateProductById({ userId, _id, name, price, image }: { u
     const updatedProduct = await Product.findOneAndUpdate({ _id, userId: new Types.ObjectId(userId) }, updateData, { new: true, runValidators: true });
     if (!updatedProduct) return { success: false, message: 'Product not found' };
 
-    // 5. Return product
+    // 5. PostHog tracking
+    trackEvent(userId, PRODUCT_UPDATED, { productId: _id, updatedFields: Object.keys(updateData) });
+
+    // 6. Return product
     return { success: true, message: 'Product updated successfully!' };
   } catch (error) {
     console.error('🚩 UPDATE_PRODUCT_ERROR:', error);
-    return { success: false, message: 'Failed to update product' };
+    const message = 'Failed to update product';
+
+    // 1. PostHog error tracking
+    trackEvent(userId, PRODUCT_UPDATE_FAILED, { error: message });
+
+    // 2. Error response
+    return { success: false, message };
   }
 }
 
