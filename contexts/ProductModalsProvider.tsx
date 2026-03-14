@@ -7,18 +7,22 @@ import { createContext, useContext, useState, ReactNode } from 'react';
 import SyncStockModal from '@/components/products/modals/SyncStockModal';
 import EditProductModal from '@/components/products/modals/EditProductModal';
 import AddProductModal from '@/components/products/modals/AddProductModal';
-import { ProductHistoryModal } from '@/components/products/modals/HistoryModal'; // 👈 Added Import
+import { ProductHistoryModal } from '@/components/products/modals/HistoryModal';
 
 // Interfaces
 import { ProductRow } from '@/types';
 
+// PostHog
+import posthog from 'posthog-js';
+import { VIEW_HISTORY_CLICKED } from '@/lib/posthog/constants';
+
 // Types
-type ModalType = 'SYNC' | 'EDIT' | 'ADD' | 'HISTORY' | null; // 👈 Added HISTORY
+type ModalType = 'SYNC' | 'EDIT' | 'ADD' | 'HISTORY' | null;
 
 interface ProductModalsContextType {
   openSyncModal: (product: ProductRow) => void;
   openEditModal: (product: ProductRow) => void;
-  openHistoryModal: (product: ProductRow) => void; // 👈 Added Interface
+  openHistoryModal: (product: ProductRow) => void;
   openAddModal: () => void;
   closeModal: () => void;
 }
@@ -40,8 +44,12 @@ export function ProductModalsProvider({ children }: { children: ReactNode }) {
 
   const openSyncModal = (product: ProductRow) => openModalHelper('SYNC', product);
   const openEditModal = (product: ProductRow) => openModalHelper('EDIT', product);
-  const openHistoryModal = (product: ProductRow) => openModalHelper('HISTORY', product); // 👈 Added Handler
   const openAddModal = () => openModalHelper('ADD');
+
+  const openHistoryModal = (product: ProductRow) => {
+    posthog.capture(VIEW_HISTORY_CLICKED, { current_route: '/products' });
+    openModalHelper('HISTORY', product);
+  };
 
   const closeModal = () => {
     setActiveModal(null);
