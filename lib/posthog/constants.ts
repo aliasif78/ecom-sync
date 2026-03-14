@@ -1,13 +1,15 @@
 // AWS S3
-export const S3_UPLOAD_INITIATED = 's3_upload_initiated';
+export const S3_UPLOAD_ATTEMPT = 's3_upload_attempt';
 export const S3_UPLOAD_SUCCESS = 's3_upload_success';
 export const S3_UPLOAD_FAILED = 's3_upload_failed';
 
 // Products
 export const PRODUCT_CREATED = 'product_created';
 export const PRODUCT_CREATION_FAILED = 'product_creation_failed';
+
 export const PRODUCT_ARCHIVED = 'product_archived';
 export const PRODUCT_ARCHIVE_FAILED = 'product_archive_failed';
+
 export const PRODUCT_UPDATED = 'product_updated';
 export const PRODUCT_UPDATE_FAILED = 'product_update_failed';
 
