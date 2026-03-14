@@ -53,3 +53,8 @@ export const USER_UPDATE_FAILED = 'user_update_failed';
 
 // History
 export const VIEW_HISTORY_CLICKED = 'view_history_clicked';
+
+// Image Upload
+export const IMAGE_UPLOAD_ATTEMPT = 'image_upload_attempt';
+export const DRAG_AND_DROP = 'drag_and_drop';
+export const CLICK_TO_UPLOAD = 'click_to_upload';

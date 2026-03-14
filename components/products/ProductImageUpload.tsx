@@ -6,12 +6,18 @@ import { useState, useRef } from 'react';
 // Next Js
 import Image from 'next/image';
 
-// Dependencies
+// Icons
 import { Upload, Loader2 } from 'lucide-react';
+
+// Dependencies
 import imageCompression from 'browser-image-compression';
+import posthog from 'posthog-js';
 
 // Actions
 import { getPresignedUploadUrl } from '@/actions/s3';
+
+// Constants
+import { CLICK_TO_UPLOAD, DRAG_AND_DROP, IMAGE_UPLOAD_ATTEMPT } from '@/lib/posthog/constants';
 
 // Types
 interface ImageUploadProps {
@@ -28,7 +34,10 @@ export const ProductImageUpload = ({ value, onChange }: ImageUploadProps) => {
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Functions
-  const handleUpload = async (file: File) => {
+  const handleUpload = async (file: File, uploadType: string) => {
+    // Record PostHog event
+    posthog.capture(IMAGE_UPLOAD_ATTEMPT, { method: uploadType });
+
     if (!file.type.startsWith('image/')) return alert('Please upload an image.');
 
     try {
@@ -43,27 +52,17 @@ export const ProductImageUpload = ({ value, onChange }: ImageUploadProps) => {
       };
 
       const compressedFile = await imageCompression(file, options);
-      console.log('Compressed File:', compressedFile);
 
       // 2. Get the Pre-signed URL from your Server Action
       const { success, url, resourceKey } = await getPresignedUploadUrl(compressedFile.name, compressedFile.type, compressedFile.size);
-      console.log('URL:', url);
-      console.log('Resource Key:', resourceKey);
       if (!success || !url) throw new Error('Failed to get upload URL');
 
       // 3. PUT the file directly to S3
-      const uploadResponse = await fetch(url, {
-        method: 'PUT',
-        body: compressedFile,
-        headers: { 'Content-Type': compressedFile.type },
-      });
-
-      console.log('Upload Response:', uploadResponse);
+      const uploadResponse = await fetch(url, { method: 'PUT', body: compressedFile, headers: { 'Content-Type': compressedFile.type } });
       if (!uploadResponse.ok) throw new Error('S3 Upload Failed');
 
       // 4. Success! Update the form state with the S3 Resource Key or URL
       const finalUrl = `https://${process.env.NEXT_PUBLIC_AWS_S3_BUCKET_NAME}.s3.${process.env.NEXT_PUBLIC_AWS_REGION}.amazonaws.com/${resourceKey}`;
-      console.log('Final URL:', finalUrl);
       onChange(finalUrl);
     } catch (error) {
       console.error('Upload Error:', error);
@@ -86,11 +85,11 @@ export const ProductImageUpload = ({ value, onChange }: ImageUploadProps) => {
         onDrop={(e) => {
           e.preventDefault();
           setIsDragging(false);
-          if (e.dataTransfer.files?.[0]) handleUpload(e.dataTransfer.files[0]);
+          if (e.dataTransfer.files?.[0]) handleUpload(e.dataTransfer.files[0], DRAG_AND_DROP);
         }}
         onClick={() => fileInputRef.current?.click()}
         className={`relative flex min-h-37.5 cursor-pointer flex-col items-center justify-center rounded-lg border-2 border-dashed transition-all ${isDragging ? 'border-indigo-500 bg-indigo-500/10' : 'border-slate-700 bg-slate-950 hover:border-slate-500'} ${value ? 'p-0' : 'p-6'}`}>
-        <input type="file" className="hidden" ref={fileInputRef} accept="image/*" onChange={(e) => e.target.files?.[0] && handleUpload(e.target.files[0])} />
+        <input type="file" className="hidden" ref={fileInputRef} accept="image/*" onChange={(e) => e.target.files?.[0] && handleUpload(e.target.files[0], CLICK_TO_UPLOAD)} />
 
         {isUploading ? (
           <div className="flex flex-col items-center space-y-2">
