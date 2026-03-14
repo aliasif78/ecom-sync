@@ -50,3 +50,6 @@ export const USER_DELETED_FAILED = 'user_deleted_failed';
 
 export const USER_UPDATED = 'user_updated';
 export const USER_UPDATE_FAILED = 'user_update_failed';
+
+// History
+export const VIEW_HISTORY_CLICKED = 'view_history_clicked';
