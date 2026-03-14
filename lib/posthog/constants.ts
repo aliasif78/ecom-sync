@@ -20,6 +20,8 @@ export const SYNC_PRODUCT = 'sync_product';
 export const SYNC_PRODUCT_FAILED = 'sync_product_failed';
 
 // Stores
+export const STORE_ADDED = 'store_added';
+export const STORE_ADD_FAILED = 'store_add_failed';
 export const STORE_CONNECTED = 'store_connected';
 export const STORE_CONNECTION_FAILED = 'store_connection_failed';
 export const STORE_DISCONNECTED = 'store_disconnected';

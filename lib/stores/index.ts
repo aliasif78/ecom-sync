@@ -8,9 +8,11 @@ import { connectDB } from '@/database/mongoose';
 
 // Constants
 import { EPlatform } from '@/lib/globalConstants';
+import { STORE_ADDED, STORE_ADD_FAILED } from '../posthog/constants';
 
-// Utils
+// Utils & Helpers
 import { getKeyPattern, isDuplicateError } from '@/lib/utils';
+import { trackEvent } from '../posthog/helpers';
 
 // --- Types ---
 export interface AddStoreParams {
@@ -27,9 +29,10 @@ const AmazonConfigSchema = z.object({ apiKey: z.string().min(5), endpoint: z.enu
 const WooCommerceConfigSchema = z.object({ storeUrl: z.url(), consumerKey: z.string().startsWith('ck_'), consumerSecret: z.string().startsWith('cs_') });
 
 export async function addStore(params: AddStoreParams) {
+  const { userId, name, platform, config, isSyncEnabled } = params;
+
   try {
     // 1. Basic Validation
-    const { userId, name, platform, config, isSyncEnabled } = params;
     if (!userId || !name || !platform) return { success: false, message: 'Missing required fields: userId, name, or platform.' };
 
     // 2. Platform-Specific Validation & Identity Extraction
@@ -53,21 +56,29 @@ export async function addStore(params: AddStoreParams) {
     // 5. Create Store
     const newStore = await Store.create({ userId: new Types.ObjectId(userId), name, platform, config: configValidation.data, isSyncEnabled, isConnected: false });
 
-    // 6. Return store
+    // 6. Track the event in PostHog
+    trackEvent(userId, STORE_ADDED, { storeId: newStore._id.toString(), platform });
+
+    // 7. Return store
     return { success: true, message: 'Store added successfully! Verifying connection...', storeId: newStore._id.toString() };
   } catch (error) {
     console.error('🚩 ADD_STORE_ERROR:', error);
+    let message = 'Failed to add store.';
 
-    // --- The Duplicate Key Handler ---
+    // --- 1. The Duplicate Key Handler ---
     // Logic: MongoDB throws code 11000 when a unique index is violated.
     // We have a compound index on { userId: 1, name: 1 }
     if (isDuplicateError(error)) {
       const pattern = getKeyPattern(error);
-      if (pattern?.config?.storeUrl) return { success: false, message: 'This store is already connected.' };
-      if (pattern?.name) return { success: false, message: 'You already have a store with this nickname.' };
+      if (pattern?.config?.storeUrl) message = 'This store is already connected.';
+      if (pattern?.name) message = 'You already have a store with this nickname.';
     }
 
-    return { success: false, message: 'Failed to add store.' };
+    // --- 2. PostHog Error Tracking ---
+    trackEvent(userId, STORE_ADD_FAILED, { error: message });
+
+    // --- 3. The Generic Error Handler ---
+    return { success: false, message };
   }
 }
 
