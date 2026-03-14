@@ -5,9 +5,11 @@ import { Types } from 'mongoose';
 
 // Constants
 import { DEF_LOC_ID } from '../globalConstants';
+import { PRODUCT_CREATED, PRODUCT_CREATION_FAILED, PRODUCT_ARCHIVED, PRODUCT_ARCHIVE_FAILED } from '@/lib/posthog/constants';
 
-// Utils
+// Utils & Helpers
 import { isDuplicateError } from '../utils';
+import { trackEvent } from '../posthog/helpers';
 
 // GET Products
 // This exists here, only because the component using it is a server component
@@ -78,18 +80,25 @@ export async function addProductByUserId({ userId, name, price, image, sku, stoc
     const inventoryByLocation = stock > 0 ? [{ locationId: DEF_LOC_ID, quantity: stock }] : [];
 
     // 4. Create product
-    await Product.create({ userId: new Types.ObjectId(userId), name, price, image, sku, inventoryByLocation });
+    const newProduct = await Product.create({ userId: new Types.ObjectId(userId), name, price, image, sku, inventoryByLocation });
 
-    // 5. Return product
+    // 5. 🚀 THE POSTHOG TRACKING
+    trackEvent(userId, PRODUCT_CREATED, { sku: newProduct.sku, price: newProduct.price, has_image: !!newProduct.image, source: 'web_form' });
+
+    // 6. Return product
     return { success: true, message: 'Product created successfully!' };
-  } catch (error) {
+  } catch (error: unknown) {
     console.error('🚩 ADD_PRODUCT_ERROR:', error);
+    let message = 'Failed to add product';
 
     // 1. Check for Duplicate Key Error (Mongoose Error Code 11000)
-    if (isDuplicateError(error)) return { success: false, message: 'This SKU already exists. Please use a unique SKU.' };
+    if (isDuplicateError(error)) message = 'This SKU already exists. Please use a unique SKU.';
 
-    // 2. Generic Error
-    return { success: false, message: 'Failed to add product' };
+    // 2. 🐒 CHAOS MONKEY PREP: Track the failure too!
+    trackEvent(userId, PRODUCT_CREATION_FAILED, { error: message });
+
+    // 3. Generic Error
+    return { success: false, message };
   }
 }
 
@@ -145,10 +154,20 @@ export async function deleteProductById({ _id, userId }: { _id: string; userId: 
     // 4. Trigger the Soft Delete instance method
     await product.softDelete();
 
-    // 5. Success Response
+    // 5. Record deletion in PostHog
+    // Use .getTime() to ensure both sides are pure numbers (milliseconds)
+    const days_active = Math.floor((new Date().getTime() - new Date(product.createdAt).getTime()) / (1000 * 60 * 60 * 24));
+    trackEvent(userId, PRODUCT_ARCHIVED, { productId: _id, days_active });
+
+    // 6. Success Response
     return { success: true, message: 'Product deleted successfully!' };
   } catch (error) {
     console.error('🚩 DELETE_PRODUCT_ERROR:', error);
-    return { success: false, message: 'Failed to delete product' };
+    const message = 'Failed to delete product';
+
+    // 🐒 CHAOS MONKEY PREP: Track the failure too!
+    trackEvent(userId, PRODUCT_ARCHIVE_FAILED, { error: message });
+
+    return { success: false, message };
   }
 }

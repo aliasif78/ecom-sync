@@ -13,9 +13,11 @@ import mongoose from 'mongoose';
 
 // Constants
 import { DEF_LOC_ID, MUTEX_ALL, PLATFORMS } from '@/lib/globalConstants';
+import { FORCE_SYNC_ALL_PRODUCTS, FORCE_SYNC_ALL_PRODUCTS_FAILED } from '@/lib/posthog/constants';
 
-// Utils
+// Utils & Helpers
 import { getCurrentUser, addSyncMutex, removeSyncMutex } from '@/lib/users';
+import { trackEvent } from '@/lib/posthog/helpers';
 
 // Inngest
 import { inngest } from '@/lib/inngest/client';
@@ -147,11 +149,20 @@ export const forceSyncAllProducts = async () => {
     // 8. Tell inngest to sync all products across all stores for the user
     await inngest.send({ name: 'inventory/force.sync.all', data: { userId } });
 
-    // 9. Return success
+    // 9. Track the event in PostHog
+    trackEvent(userId, FORCE_SYNC_ALL_PRODUCTS, {});
+
+    // 10. Return success
     return { success: true, message: 'Synced all products across all stores' };
   } catch (error) {
     console.error('🚩 FORCE_SYNC_ALL_PRODUCTS_ERROR:', error);
-    return { success: false, error: 'Failed to force sync all products' };
+    const message = 'Failed to force sync all products';
+
+    // Post Hog Error Tracking
+    trackEvent(userId, FORCE_SYNC_ALL_PRODUCTS_FAILED, { error: message });
+
+    // Error response
+    return { success: false, error: message };
   }
 };
 

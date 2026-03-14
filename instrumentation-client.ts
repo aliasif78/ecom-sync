@@ -1,3 +1,5 @@
+// Maybe, we do not need this file. Not sure.
+
 import posthog from 'posthog-js';
 
 export function register() {

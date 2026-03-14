@@ -12,6 +12,7 @@ import PostHogClient from '@/lib/posthog';
 
 // Auth
 import { getCurrentUser } from '@/lib/users';
+import { S3_UPLOAD_INITIATED } from '@/lib/posthog/constants';
 
 // Constants
 const KEY_PREFIX = 'products';
@@ -61,7 +62,7 @@ export async function getPresignedUploadUrl(fileName: string, fileType: string, 
 
     ph.capture({
       distinctId: user?._id.toString(),
-      event: 's3_upload_initiated',
+      event: S3_UPLOAD_INITIATED,
       properties: { fileType, bucket: process.env.NEXT_PUBLIC_AWS_S3_BUCKET_NAME },
     });
 
