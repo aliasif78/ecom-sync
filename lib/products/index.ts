@@ -28,22 +28,26 @@ export async function getProducts(userId: string) {
 
     // 3. Return products
     // Manually serialize ObjectId and Dates - this prevents the "Server to Client" serialization error
-    return products.map((product) => ({
-      ...product,
-      _id: product._id.toString(), // Fix ID
-      userId: product.userId.toString(), // Fix User ID
-      // If you have dates, fix them too:
-      createdAt: product.createdAt?.toISOString(),
-      updatedAt: product.updatedAt?.toISOString(),
-      // Fix nested ObjectIds in inventory
-      inventoryByLocation: product.inventoryByLocation?.map((inv: IInventoryLevel) => ({
-        ...inv,
-        _id: inv._id?.toString(), // Subdocuments have IDs too!
+    return {
+      success: true,
+      message: 'Products loaded successfully!',
+      products: products.map((product) => ({
+        ...product,
+        _id: product._id.toString(), // Fix ID
+        userId: product.userId.toString(), // Fix User ID
+        // If you have dates, fix them too:
+        createdAt: product.createdAt?.toISOString(),
+        updatedAt: product.updatedAt?.toISOString(),
+        // Fix nested ObjectIds in inventory
+        inventoryByLocation: product.inventoryByLocation?.map((inv: IInventoryLevel) => ({
+          ...inv,
+          _id: inv._id?.toString(), // Subdocuments have IDs too!
+        })),
       })),
-    }));
+    };
   } catch (error) {
     console.error('🚩 GET_PRODUCTS_ERROR:', error);
-    return [];
+    return { success: false, message: 'An unexpected error occured while fetching your products.', products: [] };
   }
 }
 

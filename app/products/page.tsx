@@ -7,11 +7,17 @@ import { getCurrentUser } from '@/lib/users';
 // Components
 import ProductHeader from '@/components/products/ProductHeader';
 import ProductTable from '@/components/products/ProductTable';
+import ErrorMessage from '@/components/shared/ErrorMessage';
 
 const Page = async () => {
   // API
   const { user } = await getCurrentUser();
-  const products = await getProducts(user?._id.toString());
+  const { products, success, message } = await getProducts(user?._id.toString());
+
+  if (!success) {
+    console.error(`🚩 Page Load Error: ${message}`);
+    return <ErrorMessage message={message} />;
+  }
 
   // Constants
   const isSyncing = user?.isSyncing || [];
