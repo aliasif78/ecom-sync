@@ -1,6 +1,7 @@
 // Next Js
 import type { Metadata } from 'next';
 import { Geist, Geist_Mono } from 'next/font/google';
+import { cookies } from 'next/headers';
 
 // Shadcn
 import { Toaster } from 'sonner';
@@ -31,6 +32,10 @@ export default async function RootLayout({ children }: Readonly<{ children: Reac
   const { data } = await supabase.auth.getUser();
   const { user } = data;
 
+  // 🐒 2. Fetch Chaos Cookie on the Server
+  const cookieStore = await cookies();
+  const isChaosActive = cookieStore.get('chaos_mode')?.value === 'true';
+
   return (
     <html lang="en">
       <body className={`${geistSans.variable} ${geistMono.variable} relative min-h-screen bg-zinc-950 font-sans text-slate-50 antialiased`} suppressHydrationWarning>
@@ -39,7 +44,7 @@ export default async function RootLayout({ children }: Readonly<{ children: Reac
           <PostHogIdentify user={user} />
 
           {/* ✅ The Navbar sits here. It decides internally whether to show up. */}
-          <Navbar user={user} />
+          <Navbar user={user} initialChaos={isChaosActive} />
 
           <main className="min-h-screen bg-zinc-950">{children}</main>
           <Toaster richColors position="top-center" />
