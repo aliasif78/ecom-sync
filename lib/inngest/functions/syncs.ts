@@ -1,5 +1,5 @@
 // Inngest
-import { inngest } from './client';
+import { inngest } from '../client';
 
 // Database
 import { connectDB } from '@/database/mongoose';
@@ -11,11 +11,11 @@ import { getAdapter } from '@/lib/adapters';
 
 // Types
 import { ProductRow } from '@/types';
-import { EPlatform } from '../globalConstants';
+import { EPlatform } from '../../globalConstants';
 
 // Utils
-import { removeSyncMutex } from '../users';
-import { pusherServer } from '../pusher';
+import { removeSyncMutex } from '../../users';
+import { pusherServer } from '../../pusher';
 
 // Helper Functions
 // The Risk: Inngest works by "replaying" your function. On replay, it expects the same code to run. If you change the internal logic of getProducts later, the replay might behave unexpectedly.
