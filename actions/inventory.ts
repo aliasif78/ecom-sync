@@ -21,6 +21,8 @@ import { trackEvent } from '@/lib/posthog/helpers';
 
 // Inngest
 import { inngest } from '@/lib/inngest/client';
+
+// Auth
 import { authGuard } from '@/lib/safe-action';
 
 export const syncProductStock = async (productId: string, newStock: number, reason: string, platform: (typeof PLATFORMS)[number], sku: string, description?: string) => {

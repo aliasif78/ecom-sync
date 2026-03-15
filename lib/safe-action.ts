@@ -47,7 +47,7 @@ export async function authGuard<T>(
       const rand = Math.random();
 
       // I) The Hard Crash (HTTP 500)
-      if (rand < 0.5) {
+      if (rand < 0.99) {
         console.error(`🚩 ${tag}_CHAOS_MODE: Simulated hard crash`);
         return { success: false, message: '🐒 Simulated hard crash Error' } as ActionResponse<T>;
       }

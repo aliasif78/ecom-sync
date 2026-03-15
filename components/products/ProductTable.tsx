@@ -1,5 +1,8 @@
 'use client';
 
+// React
+import { useState } from 'react';
+
 // Components
 import { Table } from '@/components/shared/Table';
 import { ActionButton, Icons } from '@/components/shared/TableActions';
@@ -50,6 +53,9 @@ const Spinner = ({ spin }: { spin?: boolean }) => (
 );
 
 const ProductTable = ({ products, isSyncing }: Props) => {
+  // States
+  const [disableForceSyncAll, setDisableForceSyncAll] = useState(false);
+
   // Hooks
   const { openSyncModal, openEditModal, openHistoryModal } = useProductModals();
 
@@ -65,13 +71,21 @@ const ProductTable = ({ products, isSyncing }: Props) => {
     if (!isSyncing.includes(product.sku)) openSyncModal(product);
   };
 
-  const handleForceSyncAll = () => {
+  const handleForceSyncAll = async () => {
+    if (disableForceSyncAll) return;
     posthog.capture(FORCE_SYNC_ALL_PRODUCTS_CLICKED, { current_route: '/products' });
-    forceSyncAllProducts();
+
+    setDisableForceSyncAll(true);
+    const res = await forceSyncAllProducts();
+
+    if (res.success) toast.success(res.message);
+    else toast.error(res.message);
+
+    setDisableForceSyncAll(false);
   };
 
   // Constants
-  const IS_SYNCING_ANY = isSyncing.length > 0;
+  const IS_SYNCING_ANY = disableForceSyncAll || isSyncing.length > 0;
 
   return (
     <Table title="Global Inventory" description="Real-time stock levels across all channels" recordCount={products.length} headers={['Product', 'Price', 'Status', 'Inventory', 'Actions']} headerBtn={{ label: IS_SYNCING_ANY ? 'Syncing...' : 'Force Sync All', icon: IS_SYNCING_ANY ? <Spinner spin /> : <PiSparkleFill />, onClick: () => handleForceSyncAll(), disabled: IS_SYNCING_ANY }}>
