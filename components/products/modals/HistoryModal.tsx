@@ -81,7 +81,6 @@ export const ProductHistoryModal = ({ isOpen, onClose, selectedProduct }: Produc
 
     const fetchHistory = async () => {
       setIsLoading(true);
-
       const { success, data, message } = await getProductHistory(selectedProduct._id);
 
       // 🚫 Only update state if the component hasn't unmounted or changed IDs
