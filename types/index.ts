@@ -38,6 +38,7 @@ export type ProductRow = {
   price: number;
   stock: number;
   image: string;
+  stockoutRisk: boolean;
   createdAt?: string; // It comes as a string from the server
   updatedAt?: string;
 };

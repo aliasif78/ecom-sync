@@ -109,9 +109,16 @@ const ProductTable = ({ products, isSyncing }: Props) => {
                 <div className="relative h-14 w-14 shrink-0 overflow-hidden rounded-xl border border-white/10 bg-slate-800">
                   <Image src={product.image} alt={product.name} fill sizes="(max-width: 768px) 100vw, 300px" className="rounded-lg object-cover" />
                 </div>
-                <div>
+                <div className="space-y-2">
                   <div className="text-base font-semibold text-slate-100">{product.name}</div>
-                  <div className="mt-1 font-mono text-xs text-slate-500">{product.sku}</div>
+                  <div className="font-mono text-xs text-slate-500">{product.sku}</div>
+
+                  {/* 🧠 THE SMART STOCKOUT BADGE */}
+                  {product.stockoutRisk && (
+                    <span className="inline-flex animate-pulse items-center gap-1 rounded-full border border-red-500/30 bg-red-500/10 px-2 py-0.5 text-[10px] font-bold tracking-wider text-red-400 uppercase shadow-[0_0_10px_rgba(249,115,22,0.2)]">
+                      <PiSparkleFill className="h-3 w-3" /> Stockout Risk
+                    </span>
+                  )}
                 </div>
               </div>
             </td>
