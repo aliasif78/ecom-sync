@@ -37,7 +37,7 @@ export async function authGuard<T>(
     const isChaosActive = cookieStore.get('chaos_mode')?.value === 'true';
 
     // 3. Random Failure Simulation
-    if (isChaosActive && tag !== 'GET_STORES_BY_USER_ID') {
+    if (isChaosActive && tag !== 'GET_PRESIGNED_UPLOAD_URL') {
       // A) Post Hog - Track the Chaos Strike globally using your Tag
       const ph = PostHogClient();
       ph.capture({ distinctId: user._id.toString(), event: CHAOS_MODE_ERROR, properties: { chaos_mode: true, tag } });
