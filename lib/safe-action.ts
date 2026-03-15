@@ -37,7 +37,7 @@ export async function authGuard<T>(
     const isChaosActive = cookieStore.get('chaos_mode')?.value === 'true';
 
     // 3. Random Failure Simulation
-    if (isChaosActive && tag !== 'GET_PRESIGNED_UPLOAD_URL') {
+    if (isChaosActive) {
       // A) Post Hog - Track the Chaos Strike globally using your Tag
       const ph = PostHogClient();
       ph.capture({ distinctId: user._id.toString(), event: CHAOS_MODE_ERROR, properties: { chaos_mode: true, tag } });
@@ -47,7 +47,7 @@ export async function authGuard<T>(
       const rand = Math.random();
 
       // I) The Hard Crash (HTTP 500)
-      if (rand < 0.99) {
+      if (rand > 0.99) {
         console.error(`🚩 ${tag}_CHAOS_MODE: Simulated hard crash`);
         return { success: false, message: '🐒 Simulated hard crash Error' } as ActionResponse<T>;
       }
