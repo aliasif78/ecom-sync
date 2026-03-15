@@ -24,6 +24,7 @@ import { inngest } from '@/lib/inngest/client';
 
 // Auth
 import { authGuard } from '@/lib/safe-action';
+import { HistoryEntry } from '@/components/products/modals/HistoryModal';
 
 export const syncProductStock = async (productId: string, newStock: number, reason: string, platform: (typeof PLATFORMS)[number], sku: string, description?: string) => {
   return authGuard<{ success: boolean; message: string }>('SYNC_PRODUCT_STOCK', '/products', async (userId) => {
@@ -183,7 +184,7 @@ export const forceSyncAllProducts = async () => {
 };
 
 export const getProductHistory = async (productId: string) => {
-  return authGuard<{ success: boolean; message: string; data?: unknown }>('GET_PRODUCT_HISTORY', null, async (userId) => {
+  return authGuard<{ success: boolean; message: string; data?: HistoryEntry[] }>('GET_PRODUCT_HISTORY', null, async (userId) => {
     try {
       // 1. Get the current user
       const { success, user, message } = await getCurrentUser();

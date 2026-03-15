@@ -50,7 +50,7 @@ export default function SyncStockModal({ isOpen, onClose, product }: { isOpen: b
       const res = await syncProductStock(product._id, Number(newStock), reason, MANUAL, description, product.sku);
 
       // Error
-      if (!res.success || res.message) {
+      if (!res.success) {
         console.error(res.message);
         toast.error(res.message || 'Failed to sync stock');
         return;
