@@ -39,17 +39,17 @@ const getPlatformStyle = (platform: string) => {
 
 const StoreTable = ({ stores }: Props) => {
   // States
-  const [disableDeleteId, setDisableDeleteId] = useState<string | null>(null);
+  const [disableDeleteId, setDisableDeleteId] = useState<string[]>([]);
 
   // Hooks
   const { openEditStoreModal } = useStoreModals();
 
   // Functions
   const handleDelete = async (id: string) => {
-    if (disableDeleteId === id) return;
+    if (disableDeleteId.includes(id)) return;
 
     if (confirm('Are you sure you want to disconnect this store? Synchronization will stop immediately.')) {
-      setDisableDeleteId(id);
+      setDisableDeleteId((prev) => [...prev, id]);
       const res = await deleteStoreByIdAction(id);
 
       // Success
@@ -60,7 +60,7 @@ const StoreTable = ({ stores }: Props) => {
         toast.error(res.message);
       }
 
-      setDisableDeleteId(null);
+      setDisableDeleteId((prev) => prev.filter((id) => id !== id));
     }
   };
 
@@ -122,7 +122,7 @@ const StoreTable = ({ stores }: Props) => {
             <td className="px-8 py-5 text-right text-sm font-medium whitespace-nowrap">
               <div className="flex items-center justify-end gap-3">
                 <ActionButton icon={<Icons.Edit />} onClick={() => handleEdit(store)} title="Configure Store" />
-                <ActionButton icon={<Icons.Delete />} onClick={() => handleDelete(store._id)} variant="danger" title="Remove Connection" disabled={disableDeleteId === store._id} />
+                <ActionButton icon={<Icons.Delete />} onClick={() => handleDelete(store._id)} variant="danger" disabled={disableDeleteId.includes(store._id)} title="Remove Connection" />
               </div>
             </td>
           </tr>

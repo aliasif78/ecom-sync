@@ -37,7 +37,7 @@ export async function authGuard<T>(
     const isChaosActive = cookieStore.get('chaos_mode')?.value === 'true';
 
     // 3. Random Failure Simulation
-    if (isChaosActive) {
+    if (isChaosActive && tag !== 'GET_STORES_BY_USER_ID') {
       // A) Post Hog - Track the Chaos Strike globally using your Tag
       const ph = PostHogClient();
       ph.capture({ distinctId: user._id.toString(), event: CHAOS_MODE_ERROR, properties: { chaos_mode: true, tag } });
@@ -55,7 +55,7 @@ export async function authGuard<T>(
       // II) The Tarpit (Latency)
       else {
         console.error(`🚩 ${tag}_CHAOS_MODE: Simulated latency`);
-        await new Promise((resolve) => setTimeout(resolve, 6000));
+        await new Promise((resolve) => setTimeout(resolve, 5000));
         return { success: false, message: '🐒 Simulated latency Error' } as ActionResponse<T>;
       }
     }
