@@ -19,7 +19,7 @@ import { toast } from 'sonner';
 // ---------------------------------------------------------
 // 1. Types for the Props
 // ---------------------------------------------------------
-interface HistoryEntry {
+export interface HistoryEntry {
   _id: string;
   reason: string;
   change: number; // e.g. +5 or -2
@@ -73,20 +73,36 @@ export const ProductHistoryModal = ({ isOpen, onClose, selectedProduct }: Produc
   // States
   const [history, setHistory] = useState<HistoryEntry[]>([]);
   const [isLoading, setIsLoading] = useState(false);
+  const [errorMsg, setErrorMsg] = useState('');
 
   // Effects
   useEffect(() => {
+    let isMounted = true; // 🛡️ The "Ignore" flag
+
     const fetchHistory = async () => {
       setIsLoading(true);
+      const { success, data, message } = await getProductHistory(selectedProduct._id);
 
-      const res = await getProductHistory(selectedProduct._id);
-      if (res.success && res.data) setHistory(res.data);
-      else if (res.message) toast.error(res.message);
+      // 🚫 Only update state if the component hasn't unmounted or changed IDs
+      if (isMounted) {
+        // Success
+        if (success && data) setHistory(data);
+        // Message
+        else {
+          toast.error(message);
+          setErrorMsg(message);
+        }
 
-      setIsLoading(false);
+        setIsLoading(false);
+      }
     };
 
     fetchHistory();
+
+    // 🧹 Cleanup function
+    return () => {
+      isMounted = false;
+    };
   }, [selectedProduct._id]);
 
   // Rendering Constants
@@ -117,7 +133,7 @@ export const ProductHistoryModal = ({ isOpen, onClose, selectedProduct }: Produc
             <svg className="mb-3 h-10 w-10 opacity-20" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
             </svg>
-            <p className="text-sm">No history recorded yet.</p>
+            <p className="text-sm">{errorMsg || 'No history recorded yet.'}</p>
           </div>
         )}
 

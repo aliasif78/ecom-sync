@@ -1,14 +1,12 @@
 // Components
 import StoreHeader from '@/components/stores/StoreHeader';
-import StoreTable from '@/components/stores/StoreTable';
+import StoreListWrapper from '@/components/stores/StoreListWrapper';
+import { StoreTableSkeleton } from '@/components/stores/StoreTableSkeleton';
 
 // Server Actions
-import { getStoresByUserIdAction } from '@/actions/stores';
+import { Suspense } from 'react';
 
 const Page = async () => {
-  // Run the server action
-  const { stores } = await getStoresByUserIdAction();
-
   return (
     // Page Container - Dark theme to match the table
     <div className="min-h-screen bg-slate-950 p-8 pt-30 font-sans text-slate-100">
@@ -17,7 +15,13 @@ const Page = async () => {
         <StoreHeader />
 
         {/* The Main Data Table */}
-        <StoreTable stores={stores} />
+        {/* 🚀 This is the magic. 
+          The page will load INSTANTLY. 
+          It will show the fallback (skeleton) for 6 seconds.
+          Then it will swap the skeleton for the actual data. */}
+        <Suspense fallback={<StoreTableSkeleton />}>
+          <StoreListWrapper />
+        </Suspense>
       </div>
     </div>
   );

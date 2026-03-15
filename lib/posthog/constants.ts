@@ -60,3 +60,6 @@ export const VIEW_HISTORY_CLICKED = 'view_history_clicked';
 export const IMAGE_UPLOAD_ATTEMPT = 'image_upload_attempt';
 export const DRAG_AND_DROP = 'drag_and_drop';
 export const CLICK_TO_UPLOAD = 'click_to_upload';
+
+// Chaos Mode
+export const CHAOS_MODE_ERROR = 'chaos_mode_error';

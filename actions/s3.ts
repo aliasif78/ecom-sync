@@ -8,7 +8,7 @@ import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import { v4 as uuidv4 } from 'uuid';
 
 // Auth
-import { getCurrentUser } from '@/lib/users';
+import { authGuard } from '@/lib/safe-action';
 
 // PostHog
 import { S3_UPLOAD_ATTEMPT, S3_UPLOAD_SUCCESS, S3_UPLOAD_FAILED } from '@/lib/posthog/constants';
@@ -31,50 +31,48 @@ const s3Client = new S3Client({
 });
 
 export async function getPresignedUploadUrl(fileName: string, fileType: string, fileSize: number) {
-  // 1. Validation: Don't let users upload 50GB files to your bucket
-  const maxFileSize = 5 * 1024 * 1024; // 5MB
-  if (fileSize > maxFileSize) throw new Error('File too large. Max 5MB.');
+  return authGuard<{ url: string; resourceKey: string }>('GET_PRESIGNED_UPLOAD_URL', null, async (userId) => {
+    // 1. Validation: Don't let users upload 50GB files to your bucket
+    const maxFileSize = 5 * 1024 * 1024; // 5MB
+    if (fileSize > maxFileSize) throw new Error('File too large. Max 5MB.');
 
-  // 2. Get the current user Id
-  const { user } = await getCurrentUser();
-  const userId = user?._id.toString();
+    // 2. PostHog Tracking
+    const s3PostHogData = { fileType, bucket: process.env.NEXT_PUBLIC_AWS_S3_BUCKET_NAME };
+    trackEvent(userId, S3_UPLOAD_ATTEMPT, s3PostHogData);
 
-  // 3. PostHog Tracking
-  const s3PostHogData = { fileType, bucket: process.env.NEXT_PUBLIC_AWS_S3_BUCKET_NAME };
-  trackEvent(userId, S3_UPLOAD_ATTEMPT, s3PostHogData);
+    // 3. Generate a unique key so users don't overwrite each other's images
+    const uniqueFileName = `${uuidv4()}-${fileName}`;
 
-  // 4. Generate a unique key so users don't overwrite each other's images
-  const uniqueFileName = `${uuidv4()}-${fileName}`;
-
-  // 5. Create the command
-  const command = new PutObjectCommand({
-    Bucket: process.env.NEXT_PUBLIC_AWS_S3_BUCKET_NAME!,
-    Key: `${KEY_PREFIX}/${uniqueFileName}`,
-    ContentType: fileType,
-  });
-
-  try {
-    // 6. Generate the signed URL (Valid for 60 seconds)
-    const url = await getSignedUrl(s3Client, command, {
-      expiresIn: 60,
-
-      // Tell AWS to only care about the Host and Content-Type
-      signableHeaders: new Set(['host', 'content-type']),
+    // 4. Create the command
+    const command = new PutObjectCommand({
+      Bucket: process.env.NEXT_PUBLIC_AWS_S3_BUCKET_NAME!,
+      Key: `${KEY_PREFIX}/${uniqueFileName}`,
+      ContentType: fileType,
     });
 
-    // 7. PostHog Success Tracking
-    trackEvent(userId, S3_UPLOAD_SUCCESS, s3PostHogData);
+    try {
+      // 5. Generate the signed URL (Valid for 60 seconds)
+      const url = await getSignedUrl(s3Client, command, {
+        expiresIn: 60,
 
-    // 8. Success Response
-    return { success: true, url, resourceKey: `${KEY_PREFIX}/${uniqueFileName}` };
-  } catch (error) {
-    console.error('S3 Signing Error:', error);
-    const message = 'Failed to generate upload URL';
+        // Tell AWS to only care about the Host and Content-Type
+        signableHeaders: new Set(['host', 'content-type']),
+      });
 
-    // 1. Post Hog Error Tracking
-    trackEvent(userId, S3_UPLOAD_FAILED, { ...s3PostHogData, message });
+      // 6. PostHog Success Tracking
+      trackEvent(userId, S3_UPLOAD_SUCCESS, s3PostHogData);
 
-    // 2. Return Error Response
-    return { success: false, message };
-  }
+      // 7. Success Response
+      return { success: true, message: 'Upload URL generated successfully', url, resourceKey: `${KEY_PREFIX}/${uniqueFileName}` };
+    } catch (error) {
+      console.error('S3 Signing Error:', error);
+      const message = 'Failed to generate upload URL';
+
+      // 1. Post Hog Error Tracking
+      trackEvent(userId, S3_UPLOAD_FAILED, { ...s3PostHogData, message });
+
+      // 2. Return Error Response
+      return { success: false, message };
+    }
+  });
 }

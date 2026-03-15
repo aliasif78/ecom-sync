@@ -135,7 +135,6 @@ export async function updatePassword(password: string) {
   // 2. Since we verified the OTP in step 2, we have a session.
   // We can now securely update the password.
   const { error } = await supabase.auth.updateUser({ password });
-  console.log(123, error);
 
   // 3. Force a clean sign out so the invalid session doesn't crash the response
   await supabase.auth.signOut();

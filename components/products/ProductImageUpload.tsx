@@ -12,6 +12,7 @@ import { Upload, Loader2 } from 'lucide-react';
 // Dependencies
 import imageCompression from 'browser-image-compression';
 import posthog from 'posthog-js';
+import { toast } from 'sonner';
 
 // Actions
 import { getPresignedUploadUrl } from '@/actions/s3';
@@ -54,8 +55,8 @@ export const ProductImageUpload = ({ value, onChange }: ImageUploadProps) => {
       const compressedFile = await imageCompression(file, options);
 
       // 2. Get the Pre-signed URL from your Server Action
-      const { success, url, resourceKey } = await getPresignedUploadUrl(compressedFile.name, compressedFile.type, compressedFile.size);
-      if (!success || !url) throw new Error('Failed to get upload URL');
+      const { success, message, url, resourceKey } = await getPresignedUploadUrl(compressedFile.name, compressedFile.type, compressedFile.size);
+      if (!success || !url) throw new Error(message);
 
       // 3. PUT the file directly to S3
       const uploadResponse = await fetch(url, { method: 'PUT', body: compressedFile, headers: { 'Content-Type': compressedFile.type } });
@@ -66,7 +67,10 @@ export const ProductImageUpload = ({ value, onChange }: ImageUploadProps) => {
       onChange(finalUrl);
     } catch (error) {
       console.error('Upload Error:', error);
-      alert('Failed to upload image.');
+
+      // 🛡️ The Senior Way: Extract the message safely
+      const errorMessage = error instanceof Error ? error.message : 'An unexpected error occurred';
+      toast.error(errorMessage);
     } finally {
       setIsUploading(false);
     }
