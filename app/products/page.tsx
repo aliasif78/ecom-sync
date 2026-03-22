@@ -8,6 +8,7 @@ import { getCurrentUser } from '@/lib/users';
 import ProductHeader from '@/components/products/ProductHeader';
 import ProductTable from '@/components/products/ProductTable';
 import ErrorMessage from '@/components/shared/ErrorMessage';
+import RedisStressTest from '@/components/shared/RedisStressTest';
 
 const Page = async () => {
   // API
@@ -28,8 +29,11 @@ const Page = async () => {
 
   return (
     // Page Container - Dark theme to match the table
-    <div className="min-h-screen bg-slate-950 p-8 pt-30 font-sans text-slate-100">
+    <div className="min-h-screen bg-slate-950 p-8 pt-26 font-sans text-slate-100">
       <div className="mx-auto max-w-400 space-y-8">
+        {/* Redis Distributed Lock Button */}
+        <RedisStressTest />
+
         {/* Page Header Area */}
         <ProductHeader totalStock={totalStock} lowStockCount={lowStockCount} />
 

@@ -1,5 +1,5 @@
 // Inngest
-import { inngest } from './client';
+import { inngest } from '../client';
 
 // Database
 import { connectDB } from '@/database/mongoose';
@@ -10,12 +10,12 @@ import Product from '@/database/models/Product';
 import { getAdapter } from '@/lib/adapters';
 
 // Types
-import { ProductRow } from '@/types';
-import { EPlatform } from '../globalConstants';
+import { EPlatform, MUTEX_ALL } from '../../globalConstants';
+import { ProductRow, StoreRow } from '@/types';
 
 // Utils
-import { removeSyncMutex } from '../users';
-import { pusherServer } from '../pusher';
+import { removeSyncMutex } from '../../users';
+import { pusherServer } from '../../pusher';
 
 // Helper Functions
 // The Risk: Inngest works by "replaying" your function. On replay, it expects the same code to run. If you change the internal logic of getProducts later, the replay might behave unexpectedly.
@@ -45,10 +45,26 @@ const getProducts = async (userId: string, selectFields: string) => {
   return JSON.parse(JSON.stringify(res));
 };
 
+const handleSyncCompletion = async (userId: string, sku: string, isFailure: boolean, msg?: string) => {
+  await removeSyncMutex(userId, sku);
+  await pusherServer.trigger(userId, 'sync-finished', { message: msg || `[${sku}] inventory sync ${isFailure ? 'failed' : 'completed'}.`, sku });
+};
+
 // Inngest Functions
 export const syncStockToStores = inngest.createFunction(
   // 🛡️ THROTTLE: Only allow 10 syncs per minute per user - This is better than concurrency for API rate limits
-  { id: 'sync-stock-to-stores', concurrency: 10, throttle: { limit: 10, period: '1m', key: 'event.data.userId' } },
+  {
+    id: 'sync-stock-to-stores',
+    concurrency: 10,
+    throttle: { limit: 10, period: '1m', key: 'event.data.userId' },
+    retries: 3,
+
+    // 🛡️ Ensure lock is cleared even if all retries fail!
+    onFailure: async ({ event }) => {
+      const { sku, userId } = event.data.event.data as { sku: string; userId: string };
+      handleSyncCompletion(userId, sku, true);
+    },
+  },
   { event: 'inventory/stock.updated' },
 
   async ({ event, step }) => {
@@ -68,41 +84,37 @@ export const syncStockToStores = inngest.createFunction(
       // 5. Fan-Out - Sync all stores ⚔️
       // We launch a separate step for EACH store
       // Run all syncs in parallel
-      const syncResults = [];
+      const syncResults = await Promise.all(
+        stores.map((store: StoreRow) => {
+          // Sync the store
+          step.run(`sync-${store.platform}-${store._id}`, async () => {
+            try {
+              // A. Wake up the specific adapter (Mock, Shopify, etc.)
+              const adapter = getAdapter(store.platform as EPlatform, store.config);
 
-      for (const store of stores) {
-        // Sync the store
-        const result = await step.run(`sync-${store.platform}-${store._id}`, async () => {
-          try {
-            // A. Wake up the specific adapter (Mock, Shopify, etc.)
-            const adapter = getAdapter(store.platform as EPlatform, store.config);
+              // B. Push the update
+              const result = await adapter.updateStock(sku, quantity);
 
-            // B. Push the update
-            const result = await adapter.updateStock(sku, quantity);
+              // C. Success response
+              return { store: store.name, status: 'success', message: result.message };
+            } catch (error) {
+              // D. Throw error so Inngest auto-retries ONLY this store
+              throw new Error(`Failed to sync ${store.name}: ${error}`);
+            }
+          });
 
-            // C. Success response
-            return { store: store.name, status: 'success', message: result.message };
-          } catch (error) {
-            // D. Throw error so Inngest auto-retries ONLY this store
-            throw new Error(`Failed to sync ${store.name}: ${error}`);
-          }
-        });
+          return { store: store.name, status: 'success', message: `Sync started for store ${store.name}...` };
+        })
+      );
 
-        // Add to results
-        syncResults.push(result);
-      }
+      // 🛡️ Wrap external side-effects in a step so they only happen ONCE
+      await step.run('cleanup-and-notify', async () => handleSyncCompletion(userId, sku, false));
 
       // 6. Return final results
       return { message: 'Sync Complete', sku, results: syncResults };
     } catch (error) {
       console.error(error);
       throw new Error('ERROR IN SYNCING SINGLE PRODUCT');
-    } finally {
-      // Release the mutex
-      await step.run('release-lock', () => removeSyncMutex(userId, sku));
-
-      // 📣 Tell the UI the work is done - We use the userId as the channel name so we only notify THIS user
-      await pusherServer.trigger(userId, 'sync-finished', { message: `[${sku}]'s inventory sync complete.` });
     }
   }
 );
@@ -122,20 +134,23 @@ export const forceSyncAllStores = inngest.createFunction(
       // 3. Presense check
       if (products.length === 0) return { message: 'No products found' };
 
-      // 4. Reuse the individual product sync function for all products
-      // We loop through products and INVOKE the sync function for each.
-      // We use Promise.all to run them in parallel (up to the concurrency limits you set).
-      await Promise.all(products.map((p: ProductRow) => step.invoke(`sync-product-${p.sku}`, { function: syncStockToStores, data: { sku: p.sku, quantity: p.stock, userId } })));
+      // 4 "Fan-Out" via Events, not Invokes.
+      // Instead of waiting for 1,000 functions to finish (Memory Crash), we fire 1,000 events into the queue and instantly close this function.
+      await step.run('dispatch-sync-events', async () => {
+        const eventsToFire = products.map((p: ProductRow) => ({ name: 'inventory/stock.updated', data: { sku: p.sku, quantity: p.stock, userId } }));
+
+        // Inngest can handle sending huge arrays of events efficiently
+        await inngest.send(eventsToFire);
+      });
+
+      // 🛡️ Clear the MUTEX_ALL lock so the user can use their app again!
+      await step.run('clear-global-lock', async () => handleSyncCompletion(userId, MUTEX_ALL, false, 'All products dispatched for sync!'));
 
       // 5. Return final results
       return { message: 'Force Sync Complete', productCount: products.length };
     } catch (error) {
       console.error(error);
       throw new Error('ERROR IN FORCE SYNCING ALL PRODUCTS');
-    } finally {
-      // The isSyncing array is automatically emptied at this point as each product will be removed from it one by one.
-      // 📣 Tell the UI the work is done - We use the userId as the channel name so we only notify THIS user
-      await pusherServer.trigger(userId, 'sync-finished', { message: 'Inventory sync complete!' });
     }
   }
 );

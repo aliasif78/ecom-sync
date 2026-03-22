@@ -59,6 +59,11 @@ export interface IProduct extends Document {
   inventoryByLocation: IInventoryLevel[];
   version: number;
 
+  // Analytics & AI
+  recentSalesVelocity: number; // Average units sold per day (e.g., rolling 14-day average)
+  stockoutRisk: boolean;
+  lastRiskAnalysis: Date | null;
+
   // Status
   isArchived: boolean;
   archivedAt?: Date;
@@ -119,6 +124,11 @@ const ProductSchema = new Schema<IProduct>(
     stock: { type: Number, required: true, index: true, default: 0 }, // A cached sum of all locations for fast sorting
     inventoryByLocation: [{ _id: false, locationId: { type: String, required: true }, quantity: { type: Number, default: 0 } }], // We may have different warehouses
     version: { type: Number, default: 0 }, // To prevent concurrent updates by > 1 Admins
+
+    // Analytics & AI
+    recentSalesVelocity: { type: Number, default: 0 }, // Average units sold per day (e.g., rolling 14-day average)
+    stockoutRisk: { type: Boolean, default: false },
+    lastRiskAnalysis: { type: Date, default: null },
 
     // 🗑️ Soft Delete Flags
     isArchived: { type: Boolean, default: false, index: true },
