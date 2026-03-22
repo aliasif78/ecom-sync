@@ -5,12 +5,12 @@ import { redis } from '@/lib/redis/client';
  * A Senior-level wrapper to prevent race conditions across parallel serverless functions.
  */
 export async function withDistributedLock<T>(
-  sku: string,
+  resourceId: string,
   fn: () => Promise<T>,
   retries = 3,
   delay = 500 // ms
 ): Promise<T | { success: false; message: string }> {
-  const lockKey = `lock:${sku}`;
+  const lockKey = `lock:product:${resourceId}`;
   const ttl = 30; // 30 seconds (Auto-release if the server crashes)
 
   for (let attempt = 0; attempt <= retries; attempt++) {
@@ -29,12 +29,12 @@ export async function withDistributedLock<T>(
 
     // 4. If we failed and have retries left, wait and try again
     if (attempt < retries) {
-      console.log(`[Redis] Lock busy for ${sku}, retrying in ${delay}ms...`);
+      console.log(`[Redis] Lock busy for ${resourceId}, retrying in ${delay}ms...`);
       await new Promise((resolve) => setTimeout(resolve, delay));
     }
   }
 
   // 5. Total Failure
-  console.error(`🚩 [Redis] Could not acquire lock for SKU: ${sku} after ${retries} attempts.`);
+  console.error(`🚩 [Redis] Could not acquire lock for SKU: ${resourceId} after ${retries} attempts.`);
   return { success: false, message: '🚨 System busy: Multiple updates detected for this SKU. Please try again in a moment.' };
 }
