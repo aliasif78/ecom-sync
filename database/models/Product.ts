@@ -23,6 +23,9 @@ import { Schema, models, model, Model, Document, Types, Query } from 'mongoose';
 // Constants
 import { SHOPIFY, WOOCOMMERCE, AMAZON } from '@/lib/globalConstants';
 
+// Types
+import { IConflictSnapshot } from '@/types';
+
 // ==========================================
 // 💿 CONSTANTS
 // ==========================================
@@ -74,6 +77,10 @@ export interface IProduct extends Document {
 
   // Virtuals
   readonly isSyncing: boolean;
+
+  // Split Brain
+  hasConflict: boolean;
+  conflictSnapshot: IConflictSnapshot[];
 
   // Timestamps
   createdAt: Date;
@@ -129,6 +136,22 @@ const ProductSchema = new Schema<IProduct>(
     recentSalesVelocity: { type: Number, default: 0 }, // Average units sold per day (e.g., rolling 14-day average)
     stockoutRisk: { type: Boolean, default: false },
     lastRiskAnalysis: { type: Date, default: null },
+
+    // Split Brain
+    hasConflict: { type: Boolean, default: false, index: true },
+
+    conflictSnapshot: {
+      type: [
+        {
+          storeId: { type: Schema.Types.ObjectId, ref: 'Store', required: true },
+          storeName: { type: String, required: true },
+          platform: { type: String, required: true },
+          reportedStock: { type: Number, required: true },
+          _id: false, // 🧹 SENIOR MOVE: Prevents Mongoose from wasting memory generating ObjectIds for these sub-documents.
+        },
+      ],
+      default: [], // Starts empty
+    },
 
     // 🗑️ Soft Delete Flags
     isArchived: { type: Boolean, default: false, index: true },

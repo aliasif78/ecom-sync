@@ -1,6 +1,48 @@
 // Constants
 import { VERIFICATION, ROLES } from '@/lib/globalConstants';
 
+// Interfaces
+export interface IConflictSnapshot {
+  storeId: string;
+  storeName: string; // e.g., "Main Shopify"
+  platform: string; // e.g., "shopify", "amazon"
+  reportedStock: number; // The conflicting number
+}
+
+export interface StoreRow {
+  _id: string;
+  name: string;
+  platform: 'SHOPIFY' | 'AMAZON' | 'WOOCOMMERCE';
+  isConnected: boolean;
+  isSyncEnabled: boolean;
+  lastSyncAt?: string;
+  config: Record<string, string>;
+}
+
+export interface StoreFormState {
+  // Common
+  name?: string;
+  isSyncEnabled?: boolean;
+
+  // Shopify
+  storeUrl?: string;
+  accessToken?: string;
+
+  // Amazon
+  apiKey?: string;
+  endpoint?: string;
+
+  // WooCommerce
+  consumerKey?: string;
+  consumerSecret?: string;
+}
+
+export interface InventoryAdapter {
+  validateConnection(): Promise<{ success: true } | { success: false; message: string }>;
+  getProduct(sku: string): Promise<{ sku: string; stock: number; platformId: string } | null>;
+  updateStock(sku: string, newStock: number): Promise<{ success: boolean; message: string }>;
+}
+
 // Types
 export type LoginFormValues = {
   email: string;
@@ -41,6 +83,10 @@ export type ProductRow = {
   stockoutRisk: boolean;
   createdAt?: string; // It comes as a string from the server
   updatedAt?: string;
+
+  // 🛑 The Split Brain Flags
+  hasConflict: boolean;
+  conflictSnapshot: IConflictSnapshot[];
 };
 
 export enum InventoryReason {
@@ -55,39 +101,4 @@ export enum InventoryReason {
   ORDER_FULFILLMENT = 'ORDER_FULFILLMENT', // Triggered by Shopify/Amazon Order
   ORDER_CANCELLATION = 'ORDER_CANCELLATION', // Triggered by cancelling an order
   INITIAL_COUNT = 'INITIAL_COUNT', // Triggered when product is created
-}
-
-// Interfaces
-export interface StoreRow {
-  _id: string;
-  name: string;
-  platform: 'SHOPIFY' | 'AMAZON' | 'WOOCOMMERCE';
-  isConnected: boolean;
-  isSyncEnabled: boolean;
-  lastSyncAt?: string;
-  config: Record<string, string>;
-}
-
-export interface StoreFormState {
-  // Common
-  name?: string;
-  isSyncEnabled?: boolean;
-
-  // Shopify
-  storeUrl?: string;
-  accessToken?: string;
-
-  // Amazon
-  apiKey?: string;
-  endpoint?: string;
-
-  // WooCommerce
-  consumerKey?: string;
-  consumerSecret?: string;
-}
-
-export interface InventoryAdapter {
-  validateConnection(): Promise<{ success: true } | { success: false; message: string }>;
-  getProduct(sku: string): Promise<{ sku: string; stock: number; platformId: string } | null>;
-  updateStock(sku: string, newStock: number): Promise<{ success: boolean; message: string }>;
 }
