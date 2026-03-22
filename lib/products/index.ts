@@ -124,20 +124,33 @@ export async function updateProductById({ userId, _id, name, price, image }: { u
     // 2. Connect to the DB
     await connectDB();
 
-    // 3. Build the update data
+    // 3. THE QUARANTINE CHECK (The Lockdown)
+    // We must fetch the product state BEFORE blindly updating it.
+    // We use .lean() and .select() to make this check extremely fast (virtually 0 memory overhead).
+    const productState = await Product.findOne({ _id, userId: new Types.ObjectId(userId) })
+      .select('hasConflict')
+      .lean();
+
+    if (!productState) return { success: false, message: 'Product not found' };
+
+    if (productState.hasConflict) {
+      console.warn(`🚩 UPDATE_DENIED: Product ${_id} is in Split Brain quarantine.`);
+      return { success: false, message: 'Action Denied: This product has a sync conflict. You must resolve it before editing.' };
+    }
+
+    // 4. Build the update data
     const updateData: { name?: string; price?: number; image?: string } = {};
     if (name) updateData.name = name;
     if (price !== undefined) updateData.price = price;
     if (image) updateData.image = image;
 
-    // 4. Update product
-    const updatedProduct = await Product.findOneAndUpdate({ _id, userId: new Types.ObjectId(userId) }, updateData, { new: true, runValidators: true });
-    if (!updatedProduct) return { success: false, message: 'Product not found' };
+    // 5. Update product
+    await Product.findOneAndUpdate({ _id, userId: new Types.ObjectId(userId) }, updateData, { new: true, runValidators: true });
 
-    // 5. PostHog tracking
+    // 6. PostHog tracking
     trackEvent(userId, PRODUCT_UPDATED, { productId: _id, updatedFields: Object.keys(updateData) });
 
-    // 6. Return product
+    // 7. Return product
     return { success: true, message: 'Product updated successfully!' };
   } catch (error) {
     console.error('🚩 UPDATE_PRODUCT_ERROR:', error);

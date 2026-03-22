@@ -32,12 +32,12 @@ const getStores = async (userId: string, { isSyncEnabled }: { isSyncEnabled?: bo
   return JSON.parse(JSON.stringify(results));
 };
 
-const getProducts = async (userId: string, selectFields: string) => {
+const getProducts = async (userId: string, selectFields: string, query: object = {}) => {
   // 1. Establish DB connection
   await connectDB();
 
   // 2. Get all products, with select fields
-  const res = await Product.find({ userId })
+  const res = await Product.find({ userId, ...query })
     .select(selectFields || '')
     .lean();
 
@@ -75,13 +75,24 @@ export const syncStockToStores = inngest.createFunction(
     if (!userId || !sku || quantity === undefined) return { error: 'Missing SKU or Quantity' };
 
     try {
-      // 3. Fetch Active Stores (The "Target List")
+      // 3. ☢️ THE QUARANTINE CHECK
+      const isQuarantined = await step.run('check-quarantine', async () => {
+        await connectDB();
+
+        // Use .exists() or .findOne().select() for maximum speed
+        const product = await Product.findOne({ sku, userId }).select('hasConflict').lean();
+        return product?.hasConflict || false;
+      });
+
+      if (isQuarantined) return { message: `[${sku}] is in Split Brain quarantine. Automated sync aborted.`, sku };
+
+      // 4. Fetch Active Stores (The "Target List")
       const stores = await step.run('fetch-active-stores', () => getStores(userId, { isSyncEnabled: true }));
 
-      // 4. Check if there are any stores to sync
+      // 5. Check if there are any stores to sync
       if (stores.length === 0) return { message: 'No active stores to sync.', sku };
 
-      // 5. Fan-Out - Sync all stores ⚔️
+      // 6. Fan-Out - Sync all stores ⚔️
       // We launch a separate step for EACH store
       // Run all syncs in parallel
       const syncResults = await Promise.all(
@@ -107,10 +118,10 @@ export const syncStockToStores = inngest.createFunction(
         })
       );
 
-      // 🛡️ Wrap external side-effects in a step so they only happen ONCE
+      // 7. 🛡️ Wrap external side-effects in a step so they only happen ONCE
       await step.run('cleanup-and-notify', async () => handleSyncCompletion(userId, sku, false));
 
-      // 6. Return final results
+      // 8. Return final results
       return { message: 'Sync Complete', sku, results: syncResults };
     } catch (error) {
       console.error(error);
@@ -129,7 +140,7 @@ export const forceSyncAllStores = inngest.createFunction(
 
     try {
       // 2. Get the sku & quantity of all products from Mongo DB
-      const products = await step.run('fetch-db-products', () => getProducts(userId, 'sku stock'));
+      const products = await step.run('fetch-db-products', () => getProducts(userId, 'sku stock', { hasConflict: false }));
 
       // 3. Presense check
       if (products.length === 0) return { message: 'No products found' };
