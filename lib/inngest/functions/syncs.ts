@@ -55,7 +55,7 @@ export const syncStockToStores = inngest.createFunction(
   // 🛡️ THROTTLE: Only allow 10 syncs per minute per user - This is better than concurrency for API rate limits
   {
     id: 'sync-stock-to-stores',
-    concurrency: 10,
+    concurrency: 5, // Max is 5 for inngest's free tier
     throttle: { limit: 10, period: '1m', key: 'event.data.userId' },
     retries: 3,
 
