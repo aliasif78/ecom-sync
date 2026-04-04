@@ -1,3 +1,5 @@
+export const dynamic = 'force-dynamic';
+
 // Components
 import StoreHeader from '@/components/stores/StoreHeader';
 import StoreListWrapper from '@/components/stores/StoreListWrapper';
