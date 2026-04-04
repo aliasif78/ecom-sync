@@ -87,7 +87,7 @@ export const syncStockToStores = inngest.createFunction(
       const syncResults = await Promise.all(
         stores.map((store: StoreRow) => {
           // Sync the store
-          step.run(`sync-${store.platform}-${store._id}`, async () => {
+          return step.run(`sync-${store.platform}-${store._id}`, async () => {
             try {
               // A. Wake up the specific adapter (Mock, Shopify, etc.)
               const adapter = getAdapter(store.platform as EPlatform, store.config);
@@ -103,7 +103,7 @@ export const syncStockToStores = inngest.createFunction(
             }
           });
 
-          return { store: store.name, status: 'success', message: `Sync started for store ${store.name}...` };
+          // return { store: store.name, status: 'success', message: `Sync started for store ${store.name}...` };
         })
       );
 

@@ -9,6 +9,7 @@ import ProductHeader from '@/components/products/ProductHeader';
 import ProductTable from '@/components/products/ProductTable';
 import ErrorMessage from '@/components/shared/ErrorMessage';
 import RedisStressTest from '@/components/shared/RedisStressTest';
+import Copilot from '@/components/shared/Copilot';
 
 const Page = async () => {
   // API
@@ -33,6 +34,9 @@ const Page = async () => {
       <div className="mx-auto max-w-400 space-y-8">
         {/* Redis Distributed Lock Button */}
         <RedisStressTest />
+
+        {/* AI Copilot */}
+        <Copilot />
 
         {/* Page Header Area */}
         <ProductHeader totalStock={totalStock} lowStockCount={lowStockCount} />
