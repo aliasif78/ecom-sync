@@ -174,6 +174,9 @@ export const syncUserStatus = async (mongoId: string, supabaseId: string) => {
 
 export const getCurrentUser = async () => {
   try {
+    // ⚡ THE CRITICAL FIX: Establish connection first!
+    await connectDB();
+
     // 1. Get the current user logged into supabase
     const supabaseUser = await getCurrentSbUser();
 

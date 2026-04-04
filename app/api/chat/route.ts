@@ -21,9 +21,11 @@ export const maxDuration = 30;
 export async function POST(req: Request) {
   const { messages }: { messages: UIMessage[] } = await req.json();
 
-  const { user } = await getCurrentUser();
-  if (!user) return new Response('Unauthorized', { status: 401 });
-  const userId = user._id.toString();
+  // 🛡️ Explicitly check the success of the auth helper
+  const authResult = await getCurrentUser();
+  if (!authResult.success || !authResult.user) return new Response('Unauthorized', { status: 401 });
+
+  const userId = authResult.user._id.toString();
 
   const result = streamText({
     model: google('gemini-2.5-flash-lite'),
