@@ -13,6 +13,9 @@ import { inngest } from '@/lib/inngest/client';
 // Auth
 import { getCurrentUser } from '@/lib/users'; // Check your auth path
 
+// Actions
+import { forceSyncAllProducts } from '@/actions/inventory';
+
 export const maxDuration = 30;
 
 export async function POST(req: Request) {
@@ -67,10 +70,10 @@ export async function POST(req: Request) {
         execute: async ({ sku, newQuantity, reason }: { sku: string; newQuantity?: number; reason?: string }) => {
           await connectDB();
 
-          // ⚡ FIX: Restore the Fan-Out "Sync All" capability
+          // ⚡ Restore the Fan-Out "Sync All" capability
           if (sku.toLowerCase() === 'all') {
-            await inngest.send({ name: 'inventory/force.sync.all', data: { userId } });
-            return { success: true, message: 'Force sync dispatched for all products. Inngest workers are processing the queue.' };
+            await forceSyncAllProducts();
+            return { success: true, message: 'Force sync dispatched for all products. Watch the UI for updates.' };
           }
 
           // ... Single SKU Logic
