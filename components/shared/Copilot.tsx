@@ -72,7 +72,7 @@ export default function Copilot() {
                 }
 
                 // --- TOOL: TRIGGER SYNC ---
-                if (part.type === 'tool-triggerManualSync') {
+                if (part.type === 'tool-updateAndSyncStock') {
                   if (part.state === 'output-available') {
                     const { message } = part.output as { message: string };
                     return (
@@ -84,7 +84,7 @@ export default function Copilot() {
                   // Loading State
                   return (
                     <div key={index} className="mt-2 animate-pulse text-xs text-blue-400">
-                      Dispatching Inngest Workers...
+                      Executing database update & dispatching workers...
                     </div>
                   );
                 }

@@ -13,7 +13,7 @@ export class MockAdapter implements InventoryAdapter {
     await new Promise((resolve) => setTimeout(resolve, 2000));
 
     // Simulate a random connection error
-    if (Math.random() < 0.2) return { success: false, message: 'Simulated connection failure' };
+    if (Math.random() < 0.5) return { success: false, message: 'Simulated connection failure' };
     return { success: true };
   }
 
@@ -34,7 +34,7 @@ export class MockAdapter implements InventoryAdapter {
     const rand = Math.random();
     console.log('Random number:', rand);
 
-    if (rand < 0.2) {
+    if (rand < 0.5) {
       console.log('⛔️ ERROR UPDATING STOCK RETRY ⛔️');
       throw new Error('Platform API is down (Simulated Error)');
     }

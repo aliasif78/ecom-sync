@@ -55,18 +55,25 @@ export async function POST(req: Request) {
 
       // 🧠 UPGRADE 3: Renamed and expanded to handle actual data mutation
       updateAndSyncStock: {
-        description: "Update a product's stock quantity in the database and trigger a background sync to all platforms. Use this when the user wants to manual override stock levels or log a sync reason.",
+        description: 'Update a product\'s stock and trigger a sync. Use sku "all" if the user wants to force sync ALL products. Do NOT ask for a reason if the user did not provide one, just execute the tool immediately.',
 
         // ✨ THE MAGIC: Expanded Zod schema unlocks new AI capabilities
         inputSchema: z.object({
-          sku: z.string().describe('The product SKU to update/sync.'),
-          newQuantity: z.number().optional().describe('The new stock quantity provided by the user. If they just say "sync", leave this undefined.'),
-          reason: z.string().optional().describe('The reason or description for the update (e.g., "AI Update", "Manual adjustment").'),
+          sku: z.string().describe('The product SKU to update/sync. Use "all" to sync everything.'),
+          newQuantity: z.number().optional().describe('The new stock quantity. Leave undefined if just syncing.'),
+          reason: z.string().optional().describe('The reason. Leave undefined if not provided.'),
         }),
 
         execute: async ({ sku, newQuantity, reason }: { sku: string; newQuantity?: number; reason?: string }) => {
           await connectDB();
 
+          // ⚡ FIX: Restore the Fan-Out "Sync All" capability
+          if (sku.toLowerCase() === 'all') {
+            await inngest.send({ name: 'inventory/force.sync.all', data: { userId } });
+            return { success: true, message: 'Force sync dispatched for all products. Inngest workers are processing the queue.' };
+          }
+
+          // ... Single SKU Logic
           let targetQuantity = 0;
 
           // If the user specified a new quantity, update the Master Database FIRST
@@ -75,28 +82,19 @@ export async function POST(req: Request) {
 
             if (!updatedProduct) return { success: false, message: `Failed: SKU ${sku} not found.` };
             targetQuantity = updatedProduct.stock;
-          } else {
-            // If they just said "sync", fetch the existing DB stock
+          }
+
+          // If they just said "sync", fetch the existing DB stock
+          else {
             const product = await Product.findOne({ sku, userId }).select('stock').lean();
             if (!product) return { success: false, message: `Failed: SKU ${sku} not found.` };
+
             targetQuantity = product.stock;
           }
 
           // Dispatch to Inngest with the correct quantity and the user's reason
-          await inngest.send({
-            name: 'inventory/stock.updated',
-            data: {
-              sku,
-              quantity: targetQuantity,
-              userId,
-              reason: reason || 'Manual Copilot Sync', // Optional: If your Inngest event supports a reason field
-            },
-          });
-
-          return {
-            success: true,
-            message: `Successfully set ${sku} stock to ${targetQuantity} and dispatched sync. Reason logged: ${reason || 'None'}`,
-          };
+          await inngest.send({ name: 'inventory/stock.updated', data: { sku, quantity: targetQuantity, userId, reason: reason || 'Manual Copilot Sync' } });
+          return { success: true, message: `Successfully set ${sku} stock to ${targetQuantity} and dispatched sync. Reason: ${reason || 'None provided'}` };
         },
       },
     },
