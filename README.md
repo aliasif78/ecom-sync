@@ -23,3 +23,5 @@ cd ecom-sync
 npm install
 cp .env.example .env.local
 npm run dev
+
+<img width="2880" height="2738" alt="screencapture-ecom-sync-theta-vercel-app-products-2026-04-05-20_37_41" src="https://github.com/user-attachments/assets/f2670499-9e3c-4dfd-9a64-5dd5075eb303" />
