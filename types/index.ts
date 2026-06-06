@@ -1,7 +1,10 @@
 // Constants
 import { VERIFICATION, ROLES } from '@/lib/globalConstants';
 
-// Types
+// ---------------------------------------------------------------------------
+// Auth
+// ---------------------------------------------------------------------------
+
 export type LoginFormValues = {
   email: string;
   password: string;
@@ -20,6 +23,10 @@ export type SignUpFormValues = {
   };
 };
 
+// ---------------------------------------------------------------------------
+// Users
+// ---------------------------------------------------------------------------
+
 export type UserTableRow = {
   _id: string;
   name: string;
@@ -31,6 +38,10 @@ export type UserTableRow = {
   profilePicture?: string;
 };
 
+// ---------------------------------------------------------------------------
+// Products
+// ---------------------------------------------------------------------------
+
 export type ProductRow = {
   _id: string;
   sku: string;
@@ -39,9 +50,13 @@ export type ProductRow = {
   stock: number;
   image: string;
   stockoutRisk: boolean;
-  createdAt?: string; // It comes as a string from the server
+  createdAt?: string; // Comes as a string from the server
   updatedAt?: string;
 };
+
+// ---------------------------------------------------------------------------
+// Inventory
+// ---------------------------------------------------------------------------
 
 export enum InventoryReason {
   // --- USER SELECTABLE (Show in Popup) ---
@@ -57,7 +72,10 @@ export enum InventoryReason {
   INITIAL_COUNT = 'INITIAL_COUNT', // Triggered when product is created
 }
 
-// Interfaces
+// ---------------------------------------------------------------------------
+// Stores
+// ---------------------------------------------------------------------------
+
 export interface StoreRow {
   _id: string;
   name: string;
@@ -66,6 +84,23 @@ export interface StoreRow {
   isSyncEnabled: boolean;
   lastSyncAt?: string;
   config: Record<string, string>;
+}
+
+/**
+ * Aggregated stats derived from the user's store collection.
+ * Computed server-side via a single MongoDB aggregation pipeline.
+ */
+export interface StoreStats {
+  /** Number of Shopify stores owned by the user. */
+  shopify: number;
+  /** Number of Amazon stores owned by the user. */
+  amazon: number;
+  /** Number of WooCommerce stores owned by the user. */
+  woocommerce: number;
+  /** Number of stores with `isConnected: true`. */
+  connected: number;
+  /** Number of stores with `isSyncEnabled: true`. */
+  synced: number;
 }
 
 export interface StoreFormState {
@@ -85,6 +120,10 @@ export interface StoreFormState {
   consumerKey?: string;
   consumerSecret?: string;
 }
+
+// ---------------------------------------------------------------------------
+// Adapters
+// ---------------------------------------------------------------------------
 
 export interface InventoryAdapter {
   validateConnection(): Promise<{ success: true } | { success: false; message: string }>;

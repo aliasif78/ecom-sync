@@ -1,13 +1,37 @@
 'use client';
 
-// Contenxts
+// Contexts
 import { useStoreModals } from '@/contexts/StoreModalsProvider';
 
 // Components
 import PageHeader from '../shared/PageHeader';
 
-const StoreHeader = () => {
-  // Contexts
+// Types
+import { StoreStats } from '@/types';
+
+// ---------------------------------------------------------------------------
+// Props
+// ---------------------------------------------------------------------------
+
+interface StoreHeaderProps {
+  /** Live stats computed server-side from the user's store collection. */
+  stats: StoreStats;
+}
+
+// ---------------------------------------------------------------------------
+// Component
+// ---------------------------------------------------------------------------
+
+/**
+ * Page header for the Stores dashboard.
+ *
+ * Receives pre-computed `stats` from the parent server component so that
+ * all metric values are real and dynamic — no hardcoding.
+ *
+ * The `openAddStoreModal` trigger still lives here because it requires the
+ * StoreModalsContext, which is only available on the client.
+ */
+const StoreHeader = ({ stats }: StoreHeaderProps) => {
   const { openAddStoreModal } = useStoreModals();
 
   return (
@@ -17,13 +41,11 @@ const StoreHeader = () => {
       actionLabel="Connect Store"
       onAction={openAddStoreModal}
       stats={[
-        { label: 'Amazon', value: 1, colorClass: 'text-blue-400' },
-        { label: 'Shopify', value: 1, colorClass: 'text-emerald-500' },
-        { label: 'WooCommerce', value: 1, colorClass: 'text-purple-400' },
-        { label: 'Synced', value: 3, colorClass: 'text-yellow-400' },
-        { label: 'Connected', value: 3, colorClass: 'text-green-400' },
-
-        // You can add more or leave it with just one
+        { label: 'Shopify', value: stats.shopify, colorClass: 'text-emerald-500' },
+        { label: 'Amazon', value: stats.amazon, colorClass: 'text-blue-400' },
+        { label: 'WooCommerce', value: stats.woocommerce, colorClass: 'text-purple-400' },
+        { label: 'Connected', value: stats.connected, colorClass: 'text-green-400' },
+        { label: 'Synced', value: stats.synced, colorClass: 'text-yellow-400' },
       ]}
     />
   );
