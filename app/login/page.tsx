@@ -1,26 +1,27 @@
 'use client';
 
 // React
-import { useState, useEffect, useCallback } from 'react';
+import { useState } from 'react';
 
 // Next.js
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 
 // Icons
-import { PiArrowLeft, PiEye, PiEyeSlash, PiEnvelopeSimple, PiArrowCounterClockwise } from 'react-icons/pi';
+import { PiArrowLeft, PiEye, PiEyeSlash } from 'react-icons/pi';
 
 // Shadcn
 import { toast } from 'sonner';
 
 // Actions
-import { login, signUp, resendVerificationEmail } from '@/actions/auth';
+import { login, signUp } from '@/actions/auth';
 
 // Utils
 import { getErrorMessage } from '@/lib/utils';
 
 // Components
 import GoogleButton from '@/components/auth/GoogleButton';
+import VerifyEmailScreen from '@/components/auth/VerifyEmailScreen';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -28,111 +29,15 @@ import GoogleButton from '@/components/auth/GoogleButton';
 
 type AuthErrors = Partial<Record<'email' | 'password' | 'fullName' | 'confirmPassword' | 'general', string>>;
 
-/** Top-level view state for the login page. */
+/** Controls which top-level screen is visible. */
 type View = 'auth' | 'verify';
 
 // ---------------------------------------------------------------------------
-// Constants
+// Sub-components
 // ---------------------------------------------------------------------------
 
-/** Cooldown duration in seconds between resend attempts. */
-const RESEND_COOLDOWN_S = 60;
-
-// ---------------------------------------------------------------------------
-// Shared sub-components
-// ---------------------------------------------------------------------------
-
-/** Inline field-level error message. Renders nothing when message is falsy. */
+/** Inline field-level error. Renders nothing when message is falsy. */
 const FieldError = ({ message }: { message?: string }) => (message ? <p className="mt-1.5 text-xs text-red-400">{message}</p> : null);
-
-// ---------------------------------------------------------------------------
-// VerifyEmailScreen
-// ---------------------------------------------------------------------------
-
-interface VerifyEmailScreenProps {
-  /** The email address to display and to which we resend the link. */
-  email: string;
-  /** Called when the user clicks "Back to login". */
-  onBack: () => void;
-}
-
-/**
- * Full-page card shown after a successful sign-up (or login attempt on an
- * unverified account).  Features:
- *  - Clear copy explaining what the user should do next.
- *  - "Resend" button that fires `resendVerificationEmail` and then locks
- *    itself for `RESEND_COOLDOWN_S` seconds to prevent spam.
- *  - Countdown timer that ticks down in real-time.
- */
-function VerifyEmailScreen({ email, onBack }: VerifyEmailScreenProps) {
-  const [countdown, setCountdown] = useState(RESEND_COOLDOWN_S);
-  const [isResending, setIsResending] = useState(false);
-
-  const canResend = countdown === 0 && !isResending;
-
-  // Tick the countdown down every second until it reaches 0.
-  useEffect(() => {
-    if (countdown <= 0) return;
-    const id = setInterval(() => setCountdown((c) => Math.max(0, c - 1)), 1_000);
-    return () => clearInterval(id);
-  }, [countdown]);
-
-  const handleResend = useCallback(async () => {
-    if (!canResend) return;
-    setIsResending(true);
-    try {
-      const res = await resendVerificationEmail(email);
-      if (res.success) {
-        toast.success('Verification email resent — check your inbox.');
-        setCountdown(RESEND_COOLDOWN_S);
-      } else {
-        toast.error(res.error || 'Failed to resend. Please try again.');
-      }
-    } finally {
-      setIsResending(false);
-    }
-  }, [canResend, email]);
-
-  return (
-    <div className="flex min-h-screen items-center justify-center bg-slate-950 px-4 py-12">
-      <div className="w-full max-w-md space-y-8">
-        {/* Back arrow */}
-        <button onClick={onBack} className="flex items-center gap-2 text-sm text-slate-400 transition-colors hover:text-white">
-          <PiArrowLeft size={18} />
-          Back to login
-        </button>
-
-        {/* Card */}
-        <div className="rounded-2xl border border-white/10 bg-slate-900 p-8 shadow-xl">
-          {/* Icon + heading */}
-          <div className="mb-6 flex flex-col items-center gap-4 text-center">
-            <div className="flex h-16 w-16 items-center justify-center rounded-2xl border border-indigo-500/30 bg-indigo-500/10">
-              <PiEnvelopeSimple size={32} className="text-indigo-400" />
-            </div>
-
-            <div>
-              <h2 className="text-2xl font-bold text-white">Check your inbox</h2>
-              <p className="mt-2 text-sm text-slate-400">We sent a verification link to</p>
-              <p className="mt-1 font-mono text-sm font-semibold break-all text-indigo-400">{email}</p>
-            </div>
-          </div>
-
-          {/* Instructions */}
-          <div className="mb-6 rounded-xl border border-slate-800 bg-slate-950/60 p-4 text-sm leading-relaxed text-slate-400">Click the link in the email to verify your account. Once verified, you can sign in. The link expires after 24 hours.</div>
-
-          {/* Resend button */}
-          <button onClick={handleResend} disabled={!canResend} className="flex w-full items-center justify-center gap-2 rounded-lg border border-slate-700 bg-slate-800 px-4 py-3 text-sm font-semibold text-slate-300 transition-all hover:enabled:bg-slate-700 hover:enabled:text-white disabled:cursor-not-allowed disabled:opacity-50">
-            <PiArrowCounterClockwise size={16} className={isResending ? 'animate-spin' : ''} />
-            {isResending ? 'Resending…' : canResend ? 'Resend verification email' : `Resend in ${countdown}s`}
-          </button>
-
-          {/* Hint */}
-          <p className="mt-4 text-center text-xs text-slate-600">Can&apos;t find the email? Check your spam or junk folder.</p>
-        </div>
-      </div>
-    </div>
-  );
-}
 
 // ---------------------------------------------------------------------------
 // Validation helpers
@@ -140,10 +45,6 @@ function VerifyEmailScreen({ email, onBack }: VerifyEmailScreenProps) {
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
-/**
- * Validates the login or sign-up form client-side.
- * Returns a field → error map, or null when everything is valid.
- */
 function validate(isLogin: boolean, fields: { email: string; password: string; fullName: string; confirmPassword: string }): AuthErrors | null {
   const errs: AuthErrors = {};
 
@@ -164,7 +65,7 @@ function validate(isLogin: boolean, fields: { email: string; password: string; f
 
 /**
  * Maps a server error string to the most relevant form field.
- * Falls back to the 'general' key for the banner above the form.
+ * Falls back to 'general' so it appears in the banner above the form.
  */
 function mapServerError(msg: string): AuthErrors {
   const lower = msg.toLowerCase();
@@ -174,7 +75,7 @@ function mapServerError(msg: string): AuthErrors {
 }
 
 // ---------------------------------------------------------------------------
-// LoginPage
+// Page
 // ---------------------------------------------------------------------------
 
 export default function LoginPage() {
@@ -204,19 +105,15 @@ export default function LoginPage() {
   const [amazonStore, setAmazonStore] = useState('');
   const [wooStore, setWooStore] = useState('');
 
-  /** Clears a single field's error as soon as the user starts typing. */
   const clearError = (field: keyof AuthErrors) => setErrors((prev) => ({ ...prev, [field]: undefined }));
 
-  /**
-   * Switches to the email verification screen.
-   * Stores the email so the resend button knows where to send.
-   */
-  const enterVerifyView = (emailAddress: string) => {
-    setPendingEmail(emailAddress);
+  /** Switches to the email-verification screen, storing the target address. */
+  const enterVerifyView = (addr: string) => {
+    setPendingEmail(addr);
     setView('verify');
   };
 
-  /** Resets back to the auth card in login mode. */
+  /** Returns to the auth card in login mode, clearing all error state. */
   const exitVerifyView = () => {
     setView('auth');
     setIsLogin(true);
@@ -224,13 +121,12 @@ export default function LoginPage() {
   };
 
   // ---------------------------------------------------------------------------
-  // Submit handler
+  // Submit
   // ---------------------------------------------------------------------------
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    // 1. Client-side validation
     const fieldErrors = validate(isLogin, { email, password, fullName, confirmPassword });
     if (fieldErrors) {
       setErrors(fieldErrors);
@@ -244,12 +140,10 @@ export default function LoginPage() {
       if (isLogin) {
         const res = await login({ email, password });
 
-        // Unverified account — redirect to the verification screen.
         if ('requiresEmailVerification' in res && res.requiresEmailVerification) {
           enterVerifyView(res.email ?? email);
           return;
         }
-
         if (!res.success) {
           setErrors(mapServerError(getErrorMessage(res.error as string)));
           return;
@@ -270,28 +164,26 @@ export default function LoginPage() {
           setErrors(mapServerError(getErrorMessage(res.error as string)));
           return;
         }
-
-        // Email confirmation required — show the verify screen instead of
-        // redirecting to /products (which would fail — user isn't logged in).
+        // Supabase email confirmation enabled — show verify screen.
         if ('requiresEmailVerification' in res && res.requiresEmailVerification) {
           enterVerifyView(res.email ?? email);
           return;
         }
 
-        // Supabase email confirmation disabled edge-case — proceed normally.
+        // Edge-case: email confirmation disabled on Supabase project.
         toast.success('Account created successfully');
         router.push('/products');
       }
-    } catch (error) {
+    } catch (err) {
       toast.error('Authentication failed');
-      console.error(error);
+      console.error(err);
     } finally {
       setIsLoading(false);
     }
   };
 
   // ---------------------------------------------------------------------------
-  // Render: Verify view
+  // Render: verify screen (completely replaces the auth card)
   // ---------------------------------------------------------------------------
 
   if (view === 'verify') {
@@ -299,10 +191,9 @@ export default function LoginPage() {
   }
 
   // ---------------------------------------------------------------------------
-  // Render: Auth view
+  // Render: auth card
   // ---------------------------------------------------------------------------
 
-  /** Reusable base classes for every text input on this page. */
   const inputCls = (hasError: boolean) => ['block w-full rounded-lg border bg-slate-950 px-4 py-3 text-white transition-all focus:outline-none focus:ring-1', hasError ? 'border-red-500 focus:border-red-500 focus:ring-red-500' : 'border-slate-700 focus:border-indigo-500 focus:ring-indigo-500'].join(' ');
 
   return (
@@ -313,7 +204,7 @@ export default function LoginPage() {
           <PiArrowLeft size={24} />
         </Link>
 
-        {/* Brand header */}
+        {/* Brand */}
         <div className="text-center">
           <h1 className="text-3xl font-extrabold tracking-tight text-white">
             Ecomm<span className="text-indigo-500">Sync</span>
@@ -323,14 +214,13 @@ export default function LoginPage() {
 
         {/* Card */}
         <div className="rounded-2xl border border-white/10 bg-slate-900 p-8 shadow-xl transition-all duration-300">
-          {/* General / non-field server error banner */}
+          {/* General error banner */}
           {errors.general && <div className="mb-5 rounded-lg border border-red-500/20 bg-red-500/10 px-4 py-3 text-sm text-red-400">{errors.general}</div>}
 
           <form className="space-y-5" onSubmit={handleSubmit} noValidate>
-            {/* ── SIGN-UP ONLY FIELDS ── */}
+            {/* ── Sign-up only ── */}
             {!isLogin && (
               <div className="animate-in fade-in slide-in-from-top-4 space-y-5 duration-300">
-                {/* Full Name */}
                 <div>
                   <label className="mb-2 block text-xs font-semibold tracking-wider text-slate-500 uppercase">Full Name</label>
                   <input
@@ -356,9 +246,7 @@ export default function LoginPage() {
               </div>
             )}
 
-            {/* ── COMMON FIELDS ── */}
-
-            {/* Email */}
+            {/* ── Email ── */}
             <div>
               <label className="mb-2 block text-xs font-semibold tracking-wider text-slate-500 uppercase">Email Address</label>
               <input
@@ -374,7 +262,7 @@ export default function LoginPage() {
               <FieldError message={errors.email} />
             </div>
 
-            {/* Password */}
+            {/* ── Password ── */}
             <div>
               <label className="mb-2 block text-xs font-semibold tracking-wider text-slate-500 uppercase">Password</label>
               <div className="relative">
@@ -395,7 +283,7 @@ export default function LoginPage() {
               <FieldError message={errors.password} />
             </div>
 
-            {/* Forgot password link (login mode only) */}
+            {/* Forgot password (login only) */}
             {isLogin && (
               <div className="-mt-2 text-right">
                 <Link href="/login/forgot-password" className="text-xs font-medium text-indigo-400 transition-colors hover:text-indigo-300 hover:underline">
@@ -404,7 +292,7 @@ export default function LoginPage() {
               </div>
             )}
 
-            {/* Confirm Password (sign-up only) */}
+            {/* ── Confirm password (sign-up only) ── */}
             {!isLogin && (
               <div className="animate-in fade-in slide-in-from-top-2 duration-300">
                 <label className="mb-2 block text-xs font-semibold tracking-wider text-slate-500 uppercase">Confirm Password</label>
@@ -427,7 +315,7 @@ export default function LoginPage() {
               </div>
             )}
 
-            {/* Submit */}
+            {/* ── Submit ── */}
             <div className="pt-2">
               <button type="submit" disabled={isLoading} className="group relative flex w-full justify-center rounded-lg bg-indigo-600 px-4 py-3 text-sm font-semibold text-white shadow-lg transition-all hover:bg-indigo-500 hover:shadow-indigo-500/30 focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 focus:ring-offset-slate-900 focus:outline-none disabled:cursor-not-allowed disabled:opacity-50">
                 {isLoading ? (
@@ -447,14 +335,14 @@ export default function LoginPage() {
             </div>
           </form>
 
-          {/* Toggle between login / sign-up */}
+          {/* Toggle login / sign-up */}
           <div className="mt-6 border-t border-slate-800 pt-4 text-center">
             <p className="text-sm text-slate-400">
               {isLogin ? 'New to EcommSync? ' : 'Already have an account? '}
               <button
                 type="button"
                 onClick={() => {
-                  setIsLogin((prev) => !prev);
+                  setIsLogin((p) => !p);
                   setPassword('');
                   setConfirmPassword('');
                   setErrors({});
