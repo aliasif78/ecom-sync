@@ -55,6 +55,7 @@ export const syncStockToStores = inngest.createFunction(
   // 🛡️ THROTTLE: Only allow 10 syncs per minute per user - This is better than concurrency for API rate limits
   {
     id: 'sync-stock-to-stores',
+    triggers: [{ event: 'inventory/stock.updated' }],
     concurrency: 5, // Max is 5 for inngest's free tier
     throttle: { limit: 10, period: '1m', key: 'event.data.userId' },
     retries: 3,
@@ -65,7 +66,6 @@ export const syncStockToStores = inngest.createFunction(
       handleSyncCompletion(userId, sku, true);
     },
   },
-  { event: 'inventory/stock.updated' },
 
   async ({ event, step }) => {
     // 1. Extract data
@@ -120,8 +120,11 @@ export const syncStockToStores = inngest.createFunction(
 );
 
 export const forceSyncAllStores = inngest.createFunction(
-  { id: 'force-sync-all-stores', concurrency: 1 }, // 🛡️ Prevent the system from doing 100 force syncs at once
-  { event: 'inventory/force.sync.all' },
+  {
+    id: 'force-sync-all-stores',
+    concurrency: 1, // 🛡️ Prevent the system from doing 100 force syncs at once
+    triggers: [{ event: 'inventory/force.sync.all' }],
+  },
 
   async ({ event, step }) => {
     // 1. Extract data

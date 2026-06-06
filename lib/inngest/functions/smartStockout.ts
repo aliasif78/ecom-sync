@@ -17,8 +17,11 @@ import PostHogClient from '@/lib/posthog';
 const GEN_AI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY!);
 
 export const smartStockoutCheck = inngest.createFunction(
-  { id: 'smart-stockout-analyzer', retries: 3 }, // If Gemini times out, Inngest will retry up to 3 times automatically
-  { cron: 'TZ=UTC 0 3 * * *' }, // Runs every day at 3:00 AM UTC
+  {
+    id: 'smart-stockout-analyzer',
+    retries: 3, // If Gemini times out, Inngest will retry up to 3 times automatically
+    triggers: [{ cron: 'TZ=UTC 0 3 * * *' }], // Runs every day at 3:00 AM UTC
+  },
 
   async ({ step }) => {
     // 🧮 1: Calculate Velocity (The Math Phase) - we calculate the 14-day rolling average directly in MongoDB.
