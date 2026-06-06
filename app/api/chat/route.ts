@@ -31,7 +31,7 @@ export async function POST(req: Request) {
     model: google('gemini-2.5-flash-lite'),
 
     // 🧠 UPGRADE 1: The Master Prompt. We literally tell it how to map human intent to tools.
-    system: `You are the EcommSync Copilot, an elite AI assistant for e-commerce merchants. 
+    system: `You are the EcomSync Copilot, an elite AI assistant for e-commerce merchants. 
     You manage inventory and background syncs. 
     
     CRITICAL RULES:

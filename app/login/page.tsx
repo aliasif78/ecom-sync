@@ -257,7 +257,7 @@ export default function LoginPage() {
                   clearError('email');
                 }}
                 className={inputCls(!!errors.email)}
-                placeholder="admin@ecommsync.com"
+                placeholder="admin@ecomsync.com"
               />
               <FieldError message={errors.email} />
             </div>
@@ -338,7 +338,7 @@ export default function LoginPage() {
           {/* Toggle login / sign-up */}
           <div className="mt-6 border-t border-slate-800 pt-4 text-center">
             <p className="text-sm text-slate-400">
-              {isLogin ? 'New to EcommSync? ' : 'Already have an account? '}
+              {isLogin ? 'New to EcomSync? ' : 'Already have an account? '}
               <button
                 type="button"
                 onClick={() => {
