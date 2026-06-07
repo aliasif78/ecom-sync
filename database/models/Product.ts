@@ -42,6 +42,35 @@ export interface IInventoryLevel {
   quantity: number;
 }
 
+/**
+ * A single platform's mapping entry on a product.
+ * `storeId`      — FK to the Store document that owns this listing.
+ *                  Populated on the first successful sync; null until then.
+ * `lastSyncedAt` — Timestamp of the last successful push to this platform.
+ *                  Used by the UI to show "last synced X minutes ago".
+ */
+interface IShopifyMapping {
+  storeId?: Types.ObjectId; // ref: 'Store' — written on first sync
+  productId?: string;
+  variantId?: string; // The Shopify GID returned by the adapter
+  lastSyncedAt?: Date;
+}
+
+interface IAmazonMapping {
+  storeId?: Types.ObjectId; // ref: 'Store' — written on first sync
+  asin?: string; // Amazon Standard Identification Number
+  fulfillmentSku?: string; // Amazon Fulfillment SKU
+  syncStatus: (typeof SYNC_STATES)[number];
+  lastSyncError?: string;
+  lastSyncedAt?: Date;
+}
+
+interface IWooCommerceMapping {
+  storeId?: Types.ObjectId; // ref: 'Store' — written on first sync
+  remoteId?: string; // WooCommerce numeric product ID (as string)
+  lastSyncedAt?: Date;
+}
+
 export interface IProduct extends Document {
   userId: Types.ObjectId;
   sku: string;
@@ -49,18 +78,31 @@ export interface IProduct extends Document {
   price: number;
   image: string;
 
+  /**
+   * Platform mappings — the bridge between this internal product and its
+   * live listings on external platforms.
+   *
+   * Lifecycle:
+   *   1. Product created → all mapping slots are empty (storeId = undefined).
+   *   2. First sync to a store → Inngest adapter writes storeId + platformId.
+   *   3. Subsequent syncs → adapter updates stock; lastSyncedAt is stamped.
+   *
+   * Constraint: one active store per platform per product (MVP).
+   * A product can be on Shopify, Amazon, and WooCommerce simultaneously,
+   * but only one Shopify store, one Amazon store, and one WooCommerce store.
+   */
   mappings: {
-    shopify: { productId?: string; variantId?: string };
-    amazon: { asin?: string; fulfillmentSku?: string; syncStatus: (typeof SYNC_STATES)[number]; lastSyncError?: string };
-    woocommerce: { remoteId?: string };
+    shopify: IShopifyMapping;
+    amazon: IAmazonMapping;
+    woocommerce: IWooCommerceMapping;
   };
 
-  stock: number; // Read-only summary
+  stock: number; // Read-only cached sum of all inventoryByLocation quantities
   inventoryByLocation: IInventoryLevel[];
   version: number;
 
   // Analytics & AI
-  recentSalesVelocity: number; // Average units sold per day (e.g., rolling 14-day average)
+  recentSalesVelocity: number; // Rolling 14-day average units sold per day
   stockoutRisk: boolean;
   lastRiskAnalysis: Date | null;
 
@@ -92,41 +134,53 @@ const ProductSchema = new Schema<IProduct>(
     // 🔒 OWNERSHIP
     userId: { type: Types.ObjectId, ref: 'User', required: true, index: true },
 
-    // Common
-    sku: { type: String, required: true, unique: true, index: true, uppercase: true, trim: true }, // Primary Key - immutable
+    // Common fields
+    sku: { type: String, required: true, unique: true, index: true, uppercase: true, trim: true },
     name: { type: String, required: true },
     price: { type: Number, required: true, min: [0, 'Price cannot be negative'] },
     image: { type: String, required: true },
 
-    // The Adapter Pattern: Mappings strictly typed
+    // ---------------------------------------------------------------------------
+    // The Adapter Pattern: platform mappings
+    //
+    // `storeId` on each sub-document is the FK to the Store collection.
+    // It is intentionally optional — it is only written after the first
+    // successful sync via the Inngest `syncStockToStores` function.
+    // ---------------------------------------------------------------------------
     mappings: {
       // Shopify
       shopify: {
+        storeId: { type: Types.ObjectId, ref: 'Store', default: undefined },
         productId: { type: String, sparse: true },
-        variantId: { type: String, sparse: true }, // Size/Color
+        variantId: { type: String, sparse: true }, // Shopify GID e.g. gid://shopify/ProductVariant/123
+        lastSyncedAt: { type: Date, default: undefined },
       },
 
       // Amazon
       amazon: {
+        storeId: { type: Types.ObjectId, ref: 'Store', default: undefined },
         asin: { type: String, sparse: true }, // Amazon Standard Identification Number
-        fulfillmentSku: { type: String }, // Amazon Fullfillment SKU
-        syncStatus: { type: String, enum: SYNC_STATES, default: IDLE }, // async repsonse
+        fulfillmentSku: { type: String }, // Amazon Fulfillment SKU
+        syncStatus: { type: String, enum: SYNC_STATES, default: IDLE }, // Async response flow
         lastSyncError: { type: String },
+        lastSyncedAt: { type: Date, default: undefined },
       },
 
       // WooCommerce
       woocommerce: {
-        remoteId: { type: String, sparse: true },
+        storeId: { type: Types.ObjectId, ref: 'Store', default: undefined },
+        remoteId: { type: String, sparse: true }, // WooCommerce numeric product ID (as string)
+        lastSyncedAt: { type: Date, default: undefined },
       },
     },
 
     // Current Product State
-    stock: { type: Number, required: true, index: true, default: 0 }, // A cached sum of all locations for fast sorting
-    inventoryByLocation: [{ _id: false, locationId: { type: String, required: true }, quantity: { type: Number, default: 0 } }], // We may have different warehouses
-    version: { type: Number, default: 0 }, // To prevent concurrent updates by > 1 Admins
+    stock: { type: Number, required: true, index: true, default: 0 }, // Cached sum — rebuilt on every save
+    inventoryByLocation: [{ _id: false, locationId: { type: String, required: true }, quantity: { type: Number, default: 0 } }],
+    version: { type: Number, default: 0 }, // Optimistic concurrency — prevents concurrent-admin conflicts
 
     // Analytics & AI
-    recentSalesVelocity: { type: Number, default: 0 }, // Average units sold per day (e.g., rolling 14-day average)
+    recentSalesVelocity: { type: Number, default: 0 },
     stockoutRisk: { type: Boolean, default: false },
     lastRiskAnalysis: { type: Date, default: null },
 
@@ -135,17 +189,16 @@ const ProductSchema = new Schema<IProduct>(
     archivedAt: { type: Date },
   },
 
-  // Enable timestamps
   {
     timestamps: true,
     optimisticConcurrency: true, // ⚡️ Auto-handles versioning conflicts
-    toJSON: { virtuals: true }, // Ensure virtuals show up when you res.json(product)
+    toJSON: { virtuals: true },
     toObject: { virtuals: true },
   }
 );
 
 // ==========================================
-// ⚡️ VIRTUALS - Variables on the fly
+// ⚡️ VIRTUALS
 // ==========================================
 
 ProductSchema.virtual('isSyncing').get(function () {
@@ -153,39 +206,31 @@ ProductSchema.virtual('isSyncing').get(function () {
 });
 
 // ==========================================
-// 🛡 PRE-HOOKS - The integrity guard
+// 🛡 PRE-HOOKS
 // ==========================================
 
-// PROBLEM: 'stock' and 'inventoryByLocation' can get out of sync.
-// SOLUTION: Before every save, recalculate 'stock' from the array.
+// Keep `stock` in sync with `inventoryByLocation` automatically.
 ProductSchema.pre('save', function () {
   if (!this.isModified('inventoryByLocation')) return;
-
-  const total = this.inventoryByLocation.reduce((sum, item) => sum + item.quantity, 0);
-  this.stock = total;
+  this.stock = this.inventoryByLocation.reduce((sum, item) => sum + item.quantity, 0);
 });
 
-// Hide archived products from all standard queries automatically
+// Exclude archived products from all standard queries automatically.
 ProductSchema.pre(/^find/, function (this: Query<unknown, IProduct>) {
-  // Check if the query is already explicitly asking for archived items
-  // If not, we force it to only return active items.
   if (this.getFilter().isArchived === undefined) this.where({ isArchived: { $ne: true } });
 });
 
 // ==========================================
 // 🔧 METHODS (Instance Logic)
 // ==========================================
+
 ProductSchema.methods.updateLocationStock = async function (locationId: string, newQuantity: number) {
   const locationIndex = this.inventoryByLocation.findIndex((l: IInventoryLevel) => l.locationId === locationId);
 
-  // Location does not exist, add it
   if (locationIndex === -1) this.inventoryByLocation.push({ locationId, quantity: newQuantity });
-  // Location exists, update it
   else this.inventoryByLocation[locationIndex].quantity = newQuantity;
 
-  // Finally, save the updated product
   await this.save();
-
   // TODO: Implement retry logic for VersionError
 };
 
@@ -198,27 +243,24 @@ ProductSchema.methods.softDelete = async function () {
 // ==========================================
 // 🔍 STATICS (Model Queries)
 // ==========================================
+
 ProductSchema.statics.findByPlatformId = async function (platform: typeof SHOPIFY | typeof AMAZON | typeof WOOCOMMERCE, id: string) {
-  // We will build up the Mongo DB query dynamically
   const query: { 'mappings.shopify.variantId'?: string; 'mappings.amazon.asin'?: string; 'mappings.woocommerce.remoteId'?: string } = {};
 
   if (platform === SHOPIFY) query['mappings.shopify.variantId'] = id;
   else if (platform === AMAZON) query['mappings.amazon.asin'] = id;
   else if (platform === WOOCOMMERCE) query['mappings.woocommerce.remoteId'] = id;
-  else return null; // 🛡 Guard clause: Return null if platform is invalid
+  else return null;
 
   return this.findOne(query);
 };
 
 // ==========================================
-// 🏎️ INDEXES - Speed up queries
+// 🏎️ INDEXES
 // ==========================================
 
-// We almost ALWAYS search by "User" + "SKU".
-// This index makes that query instant and prevents User A from creating a SKU that User B already has (if you want SKUs to be unique per user).
+// Combined index: instant lookup by owner + SKU, enforces per-user SKU uniqueness.
 ProductSchema.index({ userId: 1, sku: 1 }, { unique: true });
-
-// Others, done inside the model definition using the 'index' or 'sparse' options
 
 const Product = (models.Product as IProductModel) || model<IProduct, IProductModel>('Product', ProductSchema);
 export default Product;
