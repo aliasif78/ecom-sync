@@ -184,3 +184,30 @@ export interface InventoryAdapter {
   getProduct(sku: string): Promise<{ sku: string; stock: number; platformId: string } | null>;
   updateStock(sku: string, newStock: number): Promise<{ success: boolean; message: string }>;
 }
+
+// ==========================================
+// 🔐 AUTH TYPES
+// ==========================================
+
+/** Form values for the login page. */
+export interface LoginFormValues {
+  email: string;
+  password: string;
+}
+
+/**
+ * Form values for the sign-up page.
+ * `stores` captures the initial platform shop names collected during
+ * onboarding and written to the MongoDB User document on creation.
+ */
+export interface SignUpFormValues {
+  name: string;
+  email: string;
+  password: string;
+  confirmPassword: string;
+  stores: {
+    shopify: string;
+    amazon: string;
+    woocommerce: string;
+  };
+}
