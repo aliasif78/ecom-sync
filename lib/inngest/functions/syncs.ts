@@ -172,6 +172,113 @@ async function writeMappingToProduct({ sku, userId, store, adapter }: { sku: str
 // ==========================================
 
 /**
+ * `verifyStoreConnection`
+ *
+ * Triggered by: `store/store.added`
+ * Fired from:   `addStoreAction` server action (immediately after `Store.create()`)
+ *
+ * Flow:
+ *   1. Fetch the full store document from MongoDB — including `config` (credentials),
+ *      which is deliberately excluded from the public `getStoresByUserId` query.
+ *   2. Instantiate the platform adapter and call `validateConnection()`.
+ *      - MockAdapter has a 50% simulated failure rate here.
+ *      - On failure the step THROWS so Inngest retries it (up to `retries` times).
+ *        This is the key distinction: returning { success: false } is a completed
+ *        step from Inngest's perspective; only a throw triggers a retry.
+ *   3. Write `isConnected: true` to MongoDB (only reached after a successful validate).
+ *   4. Notify the client via Pusher so `StoreTable` resolves the "Verifying…" badge.
+ *
+ * `onFailure`: runs when ALL retries are exhausted. Persists `isConnected: false`
+ * and fires the Pusher event so the client badge still resolves cleanly.
+ *
+ * @param event.data.storeId - MongoDB ObjectId string of the newly created store
+ * @param event.data.userId  - MongoDB ObjectId string of the owning user (Pusher channel key)
+ */
+export const verifyStoreConnection = inngest.createFunction(
+  {
+    id: 'verify-store-connection',
+    triggers: [{ event: 'store/store.added' }],
+    retries: 3,
+
+    /**
+     * Runs when all retry attempts are exhausted.
+     * Persists the failed state and notifies the client — the "Verifying…"
+     * badge must always resolve, even when every attempt fails.
+     */
+    onFailure: async ({ event }) => {
+      const { storeId, userId } = event.data.event.data as { storeId: string; userId: string };
+
+      await connectDB();
+      await Store.findByIdAndUpdate(storeId, { isConnected: false });
+
+      await pusherServer.trigger(userId, 'store-verified', {
+        storeId,
+        isConnected: false,
+        message: 'Connection failed after multiple attempts. Please check your credentials.',
+      });
+    },
+  },
+
+  async ({ event, step }) => {
+    const { storeId, userId } = event.data;
+
+    if (!storeId || !userId) return { error: 'Missing storeId or userId in event payload' };
+
+    // ── Step 1: Fetch full store document (config included) ──────────────────
+    // We intentionally fetch the full doc here — the public-facing queries
+    // exclude `.config` for security, but the adapter needs those credentials.
+    const store = await step.run('fetch-store', async () => {
+      await connectDB();
+      const doc = await Store.findById(storeId).lean();
+      // Stringify for Inngest serialization safety (ObjectIds / Dates → strings)
+      return doc ? JSON.parse(JSON.stringify(doc)) : null;
+    });
+
+    if (!store) {
+      // Store was deleted before the job ran — nothing to do
+      console.warn(`[VERIFY] Store ${storeId} not found — may have been deleted before verification ran.`);
+      return { error: 'Store not found' };
+    }
+
+    // ── Step 2: Validate credentials with the external platform ─────────────
+    // IMPORTANT: we throw on failure so Inngest retries this step.
+    // Simply returning { success: false } would mark the step as complete and
+    // the function would proceed — retries would never fire.
+    await step.run('validate-connection', async () => {
+      const adapter = getAdapter(store.platform as EPlatform, store.config);
+      const result = await adapter.validateConnection();
+
+      if (!result.success) {
+        // Throwing causes Inngest to retry this step with backoff.
+        // The MockAdapter's 50% failure rate means this will retry ~50% of the
+        // time, demonstrating per-step retry behaviour in the Inngest dashboard.
+        throw new Error(`Connection validation failed: ${result.message}`);
+      }
+    });
+
+    // ── Step 3: Persist isConnected: true in MongoDB ─────────────────────────
+    // Only reached after a successful validateConnection() — no need to branch.
+    await step.run('persist-connection-status', async () => {
+      await connectDB();
+      await Store.findByIdAndUpdate(storeId, { isConnected: true });
+    });
+
+    // ── Step 4: Notify the client via Pusher ─────────────────────────────────
+    // `StoreTable` subscribes to this event and resolves the "Verifying…" badge.
+    await step.run('notify-client', async () => {
+      await pusherServer.trigger(userId, 'store-verified', {
+        storeId,
+        isConnected: true,
+        message: 'Store connected successfully.',
+      });
+    });
+
+    console.log(`[VERIFY] Store ${storeId} → isConnected: true`);
+    return { storeId, isConnected: true };
+  }
+);
+
+/**
  * `syncStockToStores`
  *
  * Triggered by: `inventory/stock.updated`
