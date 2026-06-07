@@ -10,6 +10,7 @@ import Divider from '@/components/products/modals/Divider';
 
 // Types
 import { StoreRow } from '@/types';
+import { StoreFieldErrors } from '@/lib/stores';
 
 // Constants
 import { EPlatform } from '@/lib/globalConstants';
@@ -24,7 +25,25 @@ import { toast } from 'sonner';
 // Types
 // ---------------------------------------------------------------------------
 
-type FormErrors = Partial<Record<'name', string>>;
+/** Covers both the nickname field and all credential fields for edit mode. */
+type FormErrors = StoreFieldErrors;
+
+// ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
+
+/**
+ * Returns true if the string is a syntactically valid absolute URL.
+ * Uses the native URL constructor so no regex maintenance is needed.
+ */
+function isValidUrl(value: string): boolean {
+  try {
+    new URL(value);
+    return true;
+  } catch {
+    return false;
+  }
+}
 
 // ---------------------------------------------------------------------------
 // Validation
@@ -32,14 +51,42 @@ type FormErrors = Partial<Record<'name', string>>;
 
 /**
  * Validates the Edit Store form client-side.
- * Credential fields are optional in edit mode ("leave blank to keep current"),
- * so only the store nickname is required.
  *
- * Returns a map of field → error message, or null if all fields are valid.
+ * - The store nickname is always required.
+ * - Credential fields are optional ("leave blank to keep current"),
+ *   but if filled in, they must pass format checks for their platform.
+ *
+ * @returns A map of field → error message, or null if all fields are valid.
  */
-function validate(name: string): FormErrors | null {
+function validate(name: string, credentials: Record<string, string>, platform: EPlatform): FormErrors | null {
   const errs: FormErrors = {};
+
   if (!name.trim()) errs.name = 'Store nickname is required.';
+
+  // Only validate credential fields that have been filled in
+  if (platform === EPlatform.SHOPIFY || platform === EPlatform.WOOCOMMERCE) {
+    const url = credentials.storeUrl?.trim();
+    if (url && !isValidUrl(url)) errs.storeUrl = 'Must be a valid URL (e.g. https://mystore.com).';
+  }
+
+  if (platform === EPlatform.SHOPIFY) {
+    const token = credentials.accessToken?.trim();
+    if (token && token.length < 10) errs.accessToken = 'Access token must be at least 10 characters.';
+  }
+
+  if (platform === EPlatform.AMAZON) {
+    const key = credentials.apiKey?.trim();
+    if (key && key.length < 5) errs.apiKey = 'API key must be at least 5 characters.';
+  }
+
+  if (platform === EPlatform.WOOCOMMERCE) {
+    const ck = credentials.consumerKey?.trim();
+    if (ck && !ck.startsWith('ck_')) errs.consumerKey = 'Consumer key must start with "ck_".';
+
+    const cs = credentials.consumerSecret?.trim();
+    if (cs && !cs.startsWith('cs_')) errs.consumerSecret = 'Consumer secret must start with "cs_".';
+  }
+
   return Object.keys(errs).length ? errs : null;
 }
 
@@ -50,7 +97,11 @@ function validate(name: string): FormErrors | null {
 /**
  * Modal for editing an existing store's nickname, sync toggle, and credentials.
  * Credential fields are optional (blank = keep existing value on the server).
- * All validation is done client-side first; server errors fall back to a toast.
+ *
+ * Error strategy (two layers):
+ *  1. Client-side: format checks on any filled-in credential before network call.
+ *  2. Server-side: if the server returns `fieldErrors`, surface them in the form
+ *     instead of a generic toast.
  */
 export const EditStoreModal = ({ isOpen, onClose, store }: { isOpen: boolean; onClose: () => void; store: StoreRow }) => {
   const [isLoading, setIsLoading] = useState(false);
@@ -59,14 +110,15 @@ export const EditStoreModal = ({ isOpen, onClose, store }: { isOpen: boolean; on
   const [credentials, setCredentials] = useState<Record<string, string>>(store.config || {});
   const [errors, setErrors] = useState<FormErrors>({});
 
-  /** Updates a credential field and clears its error. */
+  /** Updates a credential field and clears its individual error. */
   const handleCredentialChange = (key: string, value: string) => {
     setCredentials((prev) => ({ ...prev, [key]: value }));
+    setErrors((prev) => ({ ...prev, [key]: undefined }));
   };
 
   const handleSubmit = async () => {
     // 1. Client-side validation
-    const fieldErrors = validate(name);
+    const fieldErrors = validate(name, credentials, store.platform as EPlatform);
     if (fieldErrors) {
       setErrors(fieldErrors);
       return;
@@ -81,13 +133,15 @@ export const EditStoreModal = ({ isOpen, onClose, store }: { isOpen: boolean; on
         isSyncEnabled,
       });
 
-      if (!res.success) {
+      if (res.success) {
+        toast.success('Store updated!');
+        onClose();
+      } else if (res.fieldErrors && Object.keys(res.fieldErrors).length > 0) {
+        // Surface server-returned field errors directly in the form instead of a toast
+        setErrors(res.fieldErrors as FormErrors);
+      } else {
         toast.error(res.message || 'Failed to update store.');
-        return;
       }
-
-      toast.success('Store updated!');
-      onClose();
     } catch (error) {
       console.error(error);
       toast.error('An unexpected error occurred.');
@@ -124,13 +178,7 @@ export const EditStoreModal = ({ isOpen, onClose, store }: { isOpen: boolean; on
         <Divider title="Update Credentials" />
 
         <div className="animate-in fade-in space-y-4 duration-500">
-          <PlatformFields
-            mode="edit"
-            platform={store.platform as EPlatform}
-            data={credentials}
-            onChange={handleCredentialChange}
-            // No credential errors in edit mode; fields are all optional
-          />
+          <PlatformFields mode="edit" platform={store.platform as EPlatform} data={credentials} onChange={handleCredentialChange} errors={errors} />
         </div>
       </div>
 

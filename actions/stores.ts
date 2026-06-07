@@ -1,21 +1,26 @@
 'use server';
 
-// Database
+// Constants
 import { EPlatform } from '@/lib/globalConstants';
 
 // BE Functions
 import { authGuard } from '@/lib/safe-action';
-import { addStore, deleteStoreById, editStoreById, getStoresByUserId, getStoreStats } from '@/lib/stores';
+import { addStore, deleteStoreById, editStoreById, getStoresByUserId, getStoreStats, StoreFieldErrors } from '@/lib/stores';
 
 // ---------------------------------------------------------------------------
 // addStoreAction
 // ---------------------------------------------------------------------------
 
+/**
+ * Server Action — connect a new store.
+ * Typed with `StoreFieldErrors` so the client can surface per-field messages
+ * directly in the form rather than showing a generic toast.
+ */
 export async function addStoreAction(data: { name: string; platform: EPlatform; config: Record<string, unknown>; isSyncEnabled: boolean }) {
   const { name, platform, config, isSyncEnabled } = data;
   if (!name || !platform || !config || isSyncEnabled === undefined) return { success: false, message: 'Missing required fields' };
 
-  return authGuard('ADD_STORE', '/stores', (userId) => addStore({ userId, ...data }));
+  return authGuard<{ fieldErrors?: StoreFieldErrors; storeId?: string }>('ADD_STORE', '/stores', (userId) => addStore({ userId, ...data }));
 }
 
 // ---------------------------------------------------------------------------
@@ -51,9 +56,14 @@ export async function deleteStoreByIdAction(storeId: string) {
 // editStoreByIdAction
 // ---------------------------------------------------------------------------
 
+/**
+ * Server Action — update an existing store's settings and/or credentials.
+ * Typed with `StoreFieldErrors` so the client can surface per-field messages
+ * directly in the form rather than showing a generic toast.
+ */
 export async function editStoreByIdAction(storeId: string, data: { name?: string; config?: Record<string, unknown>; isSyncEnabled?: boolean }) {
   const { name, config, isSyncEnabled } = data;
   if (!storeId || (!name && !config && isSyncEnabled === undefined)) return { success: false, message: 'Missing required fields' };
 
-  return authGuard('EDIT_STORE_BY_ID', '/stores', (userId) => editStoreById({ storeId, userId, ...data }));
+  return authGuard<{ fieldErrors?: StoreFieldErrors }>('EDIT_STORE_BY_ID', '/stores', (userId) => editStoreById({ storeId, userId, ...data }));
 }

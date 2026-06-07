@@ -29,13 +29,62 @@ export interface AddStoreParams {
   config: Record<string, unknown>;
 }
 
+/** Shape of per-field credential errors returned to the client. */
+export type StoreFieldErrors = Partial<Record<'name' | 'storeUrl' | 'accessToken' | 'apiKey' | 'consumerKey' | 'consumerSecret', string>>;
+
 // ---------------------------------------------------------------------------
 // Zod Schemas — Platform-specific credential validation
 // ---------------------------------------------------------------------------
 
 const ShopifyConfigSchema = z.object({ storeUrl: z.url(), accessToken: z.string().min(10) });
 const AmazonConfigSchema = z.object({ apiKey: z.string().min(5), endpoint: z.enum(['US', 'EU']) });
-const WooCommerceConfigSchema = z.object({ storeUrl: z.url(), consumerKey: z.string().startsWith('ck_'), consumerSecret: z.string().startsWith('cs_') });
+const WooCommerceConfigSchema = z.object({
+  storeUrl: z.url(),
+  consumerKey: z.string().startsWith('ck_'),
+  consumerSecret: z.string().startsWith('cs_'),
+});
+
+// ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
+
+/**
+ * Runtime shape of the object returned by `z.treeifyError`.
+ * Zod's TS declarations are looser than the actual runtime value,
+ * so we define this locally and cast to it.
+ */
+interface ZodErrorTree {
+  errors: string[];
+  properties?: Record<string, { errors: string[] }>;
+}
+
+/**
+ * Converts a ZodError into a flat `{ field: firstErrorMessage }` map,
+ * then replaces Zod's technical messages with user-friendly copy.
+ *
+ * Uses `z.treeifyError` (Zod v4+) which returns:
+ *   `{ errors: string[], properties: { [field]: { errors: string[] } } }`
+ */
+function extractFieldErrors(error: z.ZodError): StoreFieldErrors {
+  const tree = z.treeifyError(error) as ZodErrorTree;
+  const errs: StoreFieldErrors = {};
+
+  // Pull the first error message from each field node in the tree
+  for (const [field, node] of Object.entries(tree.properties ?? {})) {
+    if (node.errors.length > 0) {
+      (errs as Record<string, string>)[field] = node.errors[0];
+    }
+  }
+
+  // Replace Zod's generic messages with actionable copy
+  if (errs.storeUrl) errs.storeUrl = 'Store URL must be a valid URL (e.g. https://mystore.myshopify.com).';
+  if (errs.accessToken) errs.accessToken = 'Access token must be at least 10 characters.';
+  if (errs.apiKey) errs.apiKey = 'API key must be at least 5 characters.';
+  if (errs.consumerKey) errs.consumerKey = 'Consumer key must start with "ck_".';
+  if (errs.consumerSecret) errs.consumerSecret = 'Consumer secret must start with "cs_".';
+
+  return errs;
+}
 
 // ---------------------------------------------------------------------------
 // addStore
@@ -56,8 +105,14 @@ export async function addStore(params: AddStoreParams) {
     else if (platform === EPlatform.WOOCOMMERCE) configValidation = WooCommerceConfigSchema.safeParse(config);
     else return { success: false, message: 'Invalid platform selected.' };
 
-    // 3. Check Credentials
-    if (!configValidation.success) return { success: false, message: `Invalid credentials for ${platform}.` };
+    // 3. Return field-level errors so the UI can highlight the exact broken fields
+    if (!configValidation.success) {
+      return {
+        success: false,
+        message: `Invalid credentials for ${platform}.`,
+        fieldErrors: extractFieldErrors(configValidation.error),
+      };
+    }
 
     // 4. Connect to DB
     await connectDB();
@@ -80,15 +135,22 @@ export async function addStore(params: AddStoreParams) {
   } catch (error) {
     console.error('🚩 ADD_STORE_ERROR:', error);
     let message = 'Failed to add store.';
+    let fieldErrors: StoreFieldErrors | undefined;
 
     if (isDuplicateError(error)) {
       const pattern = getKeyPattern(error);
-      if (pattern?.config?.storeUrl) message = 'This store is already connected.';
-      if (pattern?.name) message = 'You already have a store with this nickname.';
+      if (pattern?.config?.storeUrl) {
+        message = 'A store with this URL is already connected.';
+        fieldErrors = { storeUrl: 'A store with this URL is already connected.' };
+      }
+      if (pattern?.name) {
+        message = 'You already have a store with this nickname.';
+        fieldErrors = { name: 'You already have a store with this nickname.' };
+      }
     }
 
     trackEvent(userId, STORE_ADD_FAILED, { error: message });
-    return { success: false, message };
+    return { success: false, message, ...(fieldErrors && { fieldErrors }) };
   }
 }
 
@@ -229,33 +291,44 @@ export async function editStoreById({ storeId, userId, name, config, isSyncEnabl
     }).select('-config');
     if (!store) return { success: false, message: 'Store not found or access denied.' };
 
-    // 4. Validate the incoming config fields against the platform's schema
-    if (config) {
+    // 4. Strip blank values before validation AND before the DB update.
+    //    Empty string = "leave blank to keep current" — treat as if the key
+    //    was never sent. This must happen here so Zod's partial schemas never
+    //    see an empty string for a url/startsWith field.
+    const nonEmptyConfig = config ? Object.fromEntries(Object.entries(config).filter(([, v]) => v !== undefined && v !== null && v !== '')) : undefined;
+
+    // 5. Validate only the non-blank credential fields (partial — edit mode)
+    if (nonEmptyConfig && Object.keys(nonEmptyConfig).length > 0) {
       let configValidation;
 
-      if (store.platform === EPlatform.SHOPIFY) configValidation = ShopifyConfigSchema.partial().safeParse(config);
-      else if (store.platform === EPlatform.AMAZON) configValidation = AmazonConfigSchema.partial().safeParse(config);
-      else if (store.platform === EPlatform.WOOCOMMERCE) configValidation = WooCommerceConfigSchema.partial().safeParse(config);
+      if (store.platform === EPlatform.SHOPIFY) configValidation = ShopifyConfigSchema.partial().safeParse(nonEmptyConfig);
+      else if (store.platform === EPlatform.AMAZON) configValidation = AmazonConfigSchema.partial().safeParse(nonEmptyConfig);
+      else if (store.platform === EPlatform.WOOCOMMERCE) configValidation = WooCommerceConfigSchema.partial().safeParse(nonEmptyConfig);
       else return { success: false, message: 'Invalid platform selected.' };
 
-      if (!configValidation.success) return { success: false, message: `Incorrect credential fields for ${store.platform}.` };
+      // Return field-level errors so the UI can highlight the exact broken fields
+      if (!configValidation.success) {
+        return {
+          success: false,
+          message: `Incorrect credential fields for ${store.platform}.`,
+          fieldErrors: extractFieldErrors(configValidation.error),
+        };
+      }
     }
 
-    // 5. Build the $set update object
+    // 6. Build the $set update object
     const updateFields: Record<string, unknown> = {};
     if (name) updateFields.name = name;
     if (isSyncEnabled !== undefined) updateFields.isSyncEnabled = isSyncEnabled;
 
     // Use dot-notation for nested config keys so we merge rather than overwrite
-    if (config) {
-      Object.keys(config).forEach((key) => {
-        const value = config[key] as string | null | undefined;
-        // Skip empty/null values — "leave blank to keep current"
-        if (![undefined, '', null].includes(value)) updateFields[`config.${key}`] = value;
+    if (nonEmptyConfig) {
+      Object.keys(nonEmptyConfig).forEach((key) => {
+        updateFields[`config.${key}`] = nonEmptyConfig[key];
       });
     }
 
-    // 6. Apply update
+    // 7. Apply update
     const res = await Store.updateOne({ _id: new Types.ObjectId(storeId), userId: new Types.ObjectId(userId) }, { $set: updateFields });
     if (!res.modifiedCount) return { success: false, message: 'Store not found, access denied or no changes made.' };
 

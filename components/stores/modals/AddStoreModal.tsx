@@ -17,6 +17,9 @@ import { addStoreAction } from '@/actions/stores';
 // Constants
 import { EPlatform } from '@/lib/globalConstants';
 
+// Types
+import { StoreFieldErrors } from '@/lib/stores';
+
 // ---------------------------------------------------------------------------
 // Constants
 // ---------------------------------------------------------------------------
@@ -42,16 +45,35 @@ type FormData = {
   isSyncEnabled: boolean;
 };
 
-type FormErrors = Partial<Record<'name' | 'storeUrl' | 'accessToken' | 'apiKey' | 'consumerKey' | 'consumerSecret', string>>;
+type FormErrors = StoreFieldErrors;
+
+// ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
+
+/**
+ * Returns true if the string is a syntactically valid absolute URL.
+ * Uses the native URL constructor so no regex maintenance is needed.
+ */
+function isValidUrl(value: string): boolean {
+  try {
+    new URL(value);
+    return true;
+  } catch {
+    return false;
+  }
+}
 
 // ---------------------------------------------------------------------------
 // Validation
 // ---------------------------------------------------------------------------
 
 /**
- * Validates the Add Store form client-side.
- * Credential requirements differ per platform.
- * Returns a map of field → error message, or null if all fields are valid.
+ * Validates the Add Store form client-side before hitting the server.
+ * Checks presence, URL format, WooCommerce key prefixes, and token length
+ * so most mistakes are caught immediately with field-level messages.
+ *
+ * @returns A map of field → error message, or null if all fields are valid.
  */
 function validate(formData: FormData, platform: EPlatform): FormErrors | null {
   const errs: FormErrors = {};
@@ -59,14 +81,41 @@ function validate(formData: FormData, platform: EPlatform): FormErrors | null {
   if (!formData.name.trim()) errs.name = 'Store nickname is required.';
 
   if (platform === EPlatform.SHOPIFY) {
-    if (!formData.storeUrl.trim()) errs.storeUrl = 'Store URL is required.';
-    if (!formData.accessToken.trim()) errs.accessToken = 'Access token is required.';
+    if (!formData.storeUrl.trim()) {
+      errs.storeUrl = 'Store URL is required.';
+    } else if (!isValidUrl(formData.storeUrl.trim())) {
+      errs.storeUrl = 'Must be a valid URL (e.g. https://mystore.myshopify.com).';
+    }
+
+    if (!formData.accessToken.trim()) {
+      errs.accessToken = 'Access token is required.';
+    } else if (formData.accessToken.trim().length < 10) {
+      errs.accessToken = 'Access token must be at least 10 characters.';
+    }
   } else if (platform === EPlatform.AMAZON) {
-    if (!formData.apiKey.trim()) errs.apiKey = 'API key is required.';
+    if (!formData.apiKey.trim()) {
+      errs.apiKey = 'API key is required.';
+    } else if (formData.apiKey.trim().length < 5) {
+      errs.apiKey = 'API key must be at least 5 characters.';
+    }
   } else if (platform === EPlatform.WOOCOMMERCE) {
-    if (!formData.storeUrl.trim()) errs.storeUrl = 'Store URL is required.';
-    if (!formData.consumerKey.trim()) errs.consumerKey = 'Consumer key is required.';
-    if (!formData.consumerSecret.trim()) errs.consumerSecret = 'Consumer secret is required.';
+    if (!formData.storeUrl.trim()) {
+      errs.storeUrl = 'Store URL is required.';
+    } else if (!isValidUrl(formData.storeUrl.trim())) {
+      errs.storeUrl = 'Must be a valid URL (e.g. https://mystore.com).';
+    }
+
+    if (!formData.consumerKey.trim()) {
+      errs.consumerKey = 'Consumer key is required.';
+    } else if (!formData.consumerKey.trim().startsWith('ck_')) {
+      errs.consumerKey = 'Consumer key must start with "ck_".';
+    }
+
+    if (!formData.consumerSecret.trim()) {
+      errs.consumerSecret = 'Consumer secret is required.';
+    } else if (!formData.consumerSecret.trim().startsWith('cs_')) {
+      errs.consumerSecret = 'Consumer secret must start with "cs_".';
+    }
   }
 
   return Object.keys(errs).length ? errs : null;
@@ -79,7 +128,11 @@ function validate(formData: FormData, platform: EPlatform): FormErrors | null {
 /**
  * Modal for connecting a new external sales channel (store) to EcomSync.
  * Platform-specific credential fields are rendered by PlatformFields.
- * All validation is done client-side first; server errors fall back to a toast.
+ *
+ * Error strategy (two layers):
+ *  1. Client-side: URL format, prefix, and length checks before any network call.
+ *  2. Server-side: If the server returns `fieldErrors`, surface them in the form
+ *     instead of a generic toast, so the user knows exactly what to fix.
  */
 export const AddStoreModal = ({ isOpen, onClose }: { isOpen: boolean; onClose: () => void }) => {
   const [isLoading, setIsLoading] = useState(false);
@@ -111,7 +164,7 @@ export const AddStoreModal = ({ isOpen, onClose }: { isOpen: boolean; onClose: (
   };
 
   const handleSubmit = async () => {
-    // 1. Client-side validation
+    // 1. Client-side validation — catches format issues before hitting the network
     const fieldErrors = validate(formData, platform);
     if (fieldErrors) {
       setErrors(fieldErrors);
@@ -142,6 +195,9 @@ export const AddStoreModal = ({ isOpen, onClose }: { isOpen: boolean; onClose: (
       if (result.success) {
         toast.success(result.message);
         onClose();
+      } else if (result.fieldErrors && Object.keys(result.fieldErrors).length > 0) {
+        // Surface server-returned field errors directly in the form instead of a toast
+        setErrors(result.fieldErrors as FormErrors);
       } else {
         toast.error(result.message || 'Failed to add store.');
       }
