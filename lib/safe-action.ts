@@ -16,8 +16,19 @@ import { CHAOS_MODE_ERROR } from './posthog/constants';
 /**
  * Standardized envelope returned by every Server Action.
  * Uses `Partial<T>` so failure paths don't need to supply empty data fields.
+ *
+ * `fieldErrors` is an optional map of field-name → error-message pairs.
+ * Any action that performs field-level validation can populate it so the
+ * calling component can surface inline errors instead of a generic toast.
+ * It lives on the base type (not on `T`) because it is a cross-cutting
+ * concern — no individual action should need to redeclare it.
  */
-export type ActionResponse<T = unknown> = { success: boolean; message: string } & Partial<T>;
+export type ActionResponse<T = unknown> = {
+  success: boolean;
+  message: string;
+  /** Per-field validation errors: `{ fieldName: 'Error message' }` */
+  fieldErrors?: Record<string, string>;
+} & Partial<T>;
 
 // ---------------------------------------------------------------------------
 // authGuard
