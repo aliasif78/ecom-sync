@@ -1,11 +1,41 @@
+// Constants
+import { VERIFICATION, ROLES } from '@/lib/globalConstants';
+
 // ==========================================
 // 📦 SHARED CLIENT / SERVER TYPES
-//
+// ------------------------------------------
 // These are the serialized ("Row") shapes that cross the server→client
 // boundary. They mirror the Mongoose document interfaces but with all
 // ObjectIds and Dates converted to strings (safe for JSON serialization
 // and Next.js server→client prop passing).
 // ==========================================
+
+// ==========================================
+// 🔐 AUTH TYPES
+// ==========================================
+
+/** Form values submitted by the login page. */
+export interface LoginFormValues {
+  email: string;
+  password: string;
+}
+
+/**
+ * Form values submitted by the sign-up page.
+ * `stores` captures the initial platform shop names collected during
+ * onboarding and written directly to the MongoDB User document on creation.
+ */
+export interface SignUpFormValues {
+  name: string;
+  email: string;
+  password: string;
+  confirmPassword: string;
+  stores: {
+    shopify: string;
+    amazon: string;
+    woocommerce: string;
+  };
+}
 
 // ==========================================
 // 🏪 STORE TYPES
@@ -64,6 +94,21 @@ export interface StoreFormState {
   consumerKey?: string;
   consumerSecret?: string;
 }
+
+// ---------------------------------------------------------------------------
+// Users
+// ---------------------------------------------------------------------------
+
+export type UserTableRow = {
+  _id: string;
+  name: string;
+  email: string;
+  role: (typeof ROLES)[number];
+  status: (typeof VERIFICATION)[number];
+  lastActive: string;
+  createdAt: string;
+  profilePicture?: string;
+};
 
 // ==========================================
 // 📦 PRODUCT TYPES
@@ -183,31 +228,4 @@ export interface InventoryAdapter {
   validateConnection(): Promise<{ success: true } | { success: false; message: string }>;
   getProduct(sku: string): Promise<{ sku: string; stock: number; platformId: string } | null>;
   updateStock(sku: string, newStock: number): Promise<{ success: boolean; message: string }>;
-}
-
-// ==========================================
-// 🔐 AUTH TYPES
-// ==========================================
-
-/** Form values for the login page. */
-export interface LoginFormValues {
-  email: string;
-  password: string;
-}
-
-/**
- * Form values for the sign-up page.
- * `stores` captures the initial platform shop names collected during
- * onboarding and written to the MongoDB User document on creation.
- */
-export interface SignUpFormValues {
-  name: string;
-  email: string;
-  password: string;
-  confirmPassword: string;
-  stores: {
-    shopify: string;
-    amazon: string;
-    woocommerce: string;
-  };
 }
