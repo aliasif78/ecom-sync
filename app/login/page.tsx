@@ -3,18 +3,15 @@
 // React
 import { useState } from 'react';
 
-// Next Js
+// Next.js
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 
-// Components
-import GoogleButton from '@/components/auth/GoogleButton';
+// Icons
+import { PiArrowLeft, PiEye, PiEyeSlash } from 'react-icons/pi';
 
 // Shadcn
 import { toast } from 'sonner';
-
-// Icons
-import { PiArrowLeft } from 'react-icons/pi';
 
 // Actions
 import { login, signUp } from '@/actions/auth';
@@ -22,107 +19,192 @@ import { login, signUp } from '@/actions/auth';
 // Utils
 import { getErrorMessage } from '@/lib/utils';
 
+// Components
+import GoogleButton from '@/components/auth/GoogleButton';
+import VerifyEmailScreen from '@/components/auth/VerifyEmailScreen';
+
+// ---------------------------------------------------------------------------
+// Types
+// ---------------------------------------------------------------------------
+
+type AuthErrors = Partial<Record<'email' | 'password' | 'fullName' | 'confirmPassword' | 'general', string>>;
+
+/** Controls which top-level screen is visible. */
+type View = 'auth' | 'verify';
+
+// ---------------------------------------------------------------------------
+// Sub-components
+// ---------------------------------------------------------------------------
+
+/** Inline field-level error. Renders nothing when message is falsy. */
+const FieldError = ({ message }: { message?: string }) => (message ? <p className="mt-1.5 text-xs text-red-400">{message}</p> : null);
+
+// ---------------------------------------------------------------------------
+// Validation helpers
+// ---------------------------------------------------------------------------
+
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+function validate(isLogin: boolean, fields: { email: string; password: string; fullName: string; confirmPassword: string }): AuthErrors | null {
+  const errs: AuthErrors = {};
+
+  if (!fields.email.trim()) errs.email = 'Email is required.';
+  else if (!EMAIL_RE.test(fields.email)) errs.email = 'Enter a valid email address.';
+
+  if (!fields.password) errs.password = 'Password is required.';
+  else if (fields.password.length < 6) errs.password = 'Password must be at least 6 characters.';
+
+  if (!isLogin) {
+    if (!fields.fullName.trim()) errs.fullName = 'Full name is required.';
+    if (!fields.confirmPassword) errs.confirmPassword = 'Please confirm your password.';
+    else if (fields.confirmPassword !== fields.password) errs.confirmPassword = 'Passwords do not match.';
+  }
+
+  return Object.keys(errs).length ? errs : null;
+}
+
+/**
+ * Maps a server error string to the most relevant form field.
+ * Falls back to 'general' so it appears in the banner above the form.
+ */
+function mapServerError(msg: string): AuthErrors {
+  const lower = msg.toLowerCase();
+  if (lower.includes('password')) return { password: msg };
+  if (lower.includes('email') || lower.includes('user') || lower.includes('exist')) return { email: msg };
+  return { general: msg };
+}
+
+// ---------------------------------------------------------------------------
+// Page
+// ---------------------------------------------------------------------------
+
 export default function LoginPage() {
-  // Hooks
   const router = useRouter();
 
-  // =========
-  // States
-  // =========
+  // ── View ──
+  const [view, setView] = useState<View>('auth');
+  const [pendingEmail, setPendingEmail] = useState('');
 
-  // General
+  // ── Mode ──
   const [isLogin, setIsLogin] = useState(true);
   const [isLoading, setIsLoading] = useState(false);
+  const [errors, setErrors] = useState<AuthErrors>({});
 
-  // Core Auth State
+  // ── Shared fields ──
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
 
-  // Signup Only State
+  // ── Sign-up only fields ──
   const [fullName, setFullName] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
+  const [showConfirm, setShowConfirm] = useState(false);
 
-  // Store Info State
+  // ── Optional store connection fields ──
   const [shopifyStore, setShopifyStore] = useState('');
   const [amazonStore, setAmazonStore] = useState('');
   const [wooStore, setWooStore] = useState('');
 
-  // =========
-  // Functions
-  // =========
-  const handleError = (msg: string) => {
-    toast.error(getErrorMessage(msg));
-    setIsLoading(false);
+  const clearError = (field: keyof AuthErrors) => setErrors((prev) => ({ ...prev, [field]: undefined }));
+
+  /** Switches to the email-verification screen, storing the target address. */
+  const enterVerifyView = (addr: string) => {
+    setPendingEmail(addr);
+    setView('verify');
   };
 
-  const handleResult = (res: { success: boolean; error: unknown }, successMsg: string, redirectPath: string) => {
-    if (!res.success || res.error) {
-      handleError(res.error as string);
-      return;
-    }
-
-    // 4. Success
-    toast.success(successMsg);
-    router.push(redirectPath);
+  /** Returns to the auth card in login mode, clearing all error state. */
+  const exitVerifyView = () => {
+    setView('auth');
+    setIsLogin(true);
+    setErrors({});
   };
+
+  // ---------------------------------------------------------------------------
+  // Submit
+  // ---------------------------------------------------------------------------
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    const fieldErrors = validate(isLogin, { email, password, fullName, confirmPassword });
+    if (fieldErrors) {
+      setErrors(fieldErrors);
+      return;
+    }
+
     setIsLoading(true);
+    setErrors({});
 
     try {
-      // =========
-      // LOGIN
-      // =========
       if (isLogin) {
-        // 1. Validation
-        if (!email || !password) {
-          handleError('Email and password are required');
-          return;
-        }
-
-        // 2. Call the server action
         const res = await login({ email, password });
-        handleResult({ success: res.success, error: res.error }, 'Login successful', '/products');
-      }
 
-      // =========
-      // SIGNUP
-      // =========
-      else {
-        // 1. Validation
-        if (!email || !password || !fullName || !confirmPassword) {
-          handleError('All fields are required');
+        if ('requiresEmailVerification' in res && res.requiresEmailVerification) {
+          enterVerifyView(res.email ?? email);
+          return;
+        }
+        if (!res.success) {
+          setErrors(mapServerError(getErrorMessage(res.error as string)));
           return;
         }
 
-        if (password !== confirmPassword) {
-          handleError("Passwords don't match");
+        toast.success('Login successful');
+        router.push('/products');
+      } else {
+        const res = await signUp({
+          email,
+          password,
+          confirmPassword,
+          name: fullName,
+          stores: { shopify: shopifyStore, amazon: amazonStore, woocommerce: wooStore },
+        });
+
+        if (!res.success) {
+          setErrors(mapServerError(getErrorMessage(res.error as string)));
+          return;
+        }
+        // Supabase email confirmation enabled — show verify screen.
+        if ('requiresEmailVerification' in res && res.requiresEmailVerification) {
+          enterVerifyView(res.email ?? email);
           return;
         }
 
-        // 2. Signup
-        const stores = { shopify: shopifyStore, amazon: amazonStore, woocommerce: wooStore };
-        const res = await signUp({ email, password, confirmPassword, name: fullName, stores });
-        handleResult({ success: res.success, error: res.error }, 'Account created successfully', '/products');
+        // Edge-case: email confirmation disabled on Supabase project.
+        toast.success('Account created successfully');
+        router.push('/products');
       }
-    } catch (error) {
+    } catch (err) {
       toast.error('Authentication failed');
-      console.error(error);
+      console.error(err);
+    } finally {
       setIsLoading(false);
     }
   };
 
+  // ---------------------------------------------------------------------------
+  // Render: verify screen (completely replaces the auth card)
+  // ---------------------------------------------------------------------------
+
+  if (view === 'verify') {
+    return <VerifyEmailScreen email={pendingEmail} onBack={exitVerifyView} />;
+  }
+
+  // ---------------------------------------------------------------------------
+  // Render: auth card
+  // ---------------------------------------------------------------------------
+
+  const inputCls = (hasError: boolean) => ['block w-full rounded-lg border bg-slate-950 px-4 py-3 text-white transition-all focus:outline-none focus:ring-1', hasError ? 'border-red-500 focus:border-red-500 focus:ring-red-500' : 'border-slate-700 focus:border-indigo-500 focus:ring-indigo-500'].join(' ');
+
   return (
     <div className="flex min-h-screen items-center justify-center bg-slate-950 px-4 py-12 sm:px-6 lg:px-8">
-      {/* Form */}
       <div className="relative w-full max-w-md space-y-8">
-        {/* Back Arrow */}
+        {/* Back arrow */}
         <Link href="/" className="absolute top-2 left-0 text-white transition-colors hover:text-indigo-500">
           <PiArrowLeft size={24} />
         </Link>
 
-        {/* Brand Header */}
+        {/* Brand */}
         <div className="text-center">
           <h1 className="text-3xl font-extrabold tracking-tight text-white">
             Ecomm<span className="text-indigo-500">Sync</span>
@@ -130,22 +212,33 @@ export default function LoginPage() {
           <p className="mt-2 text-sm text-slate-400">{isLogin ? 'Welcome back, Captain.' : 'Initialize your command center.'}</p>
         </div>
 
-        {/* The Card */}
+        {/* Card */}
         <div className="rounded-2xl border border-white/10 bg-slate-900 p-8 shadow-xl transition-all duration-300">
-          <form className="space-y-5" onSubmit={handleSubmit}>
-            {/* --- SIGNUP ONLY FIELDS --- */}
+          {/* General error banner */}
+          {errors.general && <div className="mb-5 rounded-lg border border-red-500/20 bg-red-500/10 px-4 py-3 text-sm text-red-400">{errors.general}</div>}
+
+          <form className="space-y-5" onSubmit={handleSubmit} noValidate>
+            {/* ── Sign-up only ── */}
             {!isLogin && (
               <div className="animate-in fade-in slide-in-from-top-4 space-y-5 duration-300">
-                {/* Full Name */}
                 <div>
                   <label className="mb-2 block text-xs font-semibold tracking-wider text-slate-500 uppercase">Full Name</label>
-                  <input type="text" required value={fullName} onChange={(e) => setFullName(e.target.value)} className="block w-full rounded-lg border border-slate-700 bg-slate-950 px-4 py-3 text-white transition-all focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 focus:outline-none" placeholder="John Doe" />
+                  <input
+                    type="text"
+                    value={fullName}
+                    onChange={(e) => {
+                      setFullName(e.target.value);
+                      clearError('fullName');
+                    }}
+                    className={inputCls(!!errors.fullName)}
+                    placeholder="John Doe"
+                  />
+                  <FieldError message={errors.fullName} />
                 </div>
 
-                {/* Store Info Section */}
+                {/* Optional store connections */}
                 <div className="space-y-4 rounded-lg border border-slate-800 bg-slate-950/50 p-4">
                   <p className="text-xs font-medium tracking-wider text-slate-400 uppercase">Store Connections (Optional)</p>
-
                   <input type="text" value={shopifyStore} onChange={(e) => setShopifyStore(e.target.value)} className="block w-full rounded-md border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-white focus:border-indigo-500 focus:outline-none" placeholder="Shopify Store URL (myshop.shopify.com)" />
                   <input type="text" value={amazonStore} onChange={(e) => setAmazonStore(e.target.value)} className="block w-full rounded-md border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-white focus:border-indigo-500 focus:outline-none" placeholder="Amazon Seller ID" />
                   <input type="text" value={wooStore} onChange={(e) => setWooStore(e.target.value)} className="block w-full rounded-md border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-white focus:border-indigo-500 focus:outline-none" placeholder="WooCommerce Store URL" />
@@ -153,39 +246,85 @@ export default function LoginPage() {
               </div>
             )}
 
-            {/* --- COMMON FIELDS --- */}
-
-            {/* Email */}
+            {/* ── Email ── */}
             <div>
               <label className="mb-2 block text-xs font-semibold tracking-wider text-slate-500 uppercase">Email Address</label>
-              <input type="email" required value={email} onChange={(e) => setEmail(e.target.value)} className="block w-full rounded-lg border border-slate-700 bg-slate-950 px-4 py-3 text-white transition-all focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 focus:outline-none" placeholder="admin@ecommsync.com" />
+              <input
+                type="email"
+                value={email}
+                onChange={(e) => {
+                  setEmail(e.target.value);
+                  clearError('email');
+                }}
+                className={inputCls(!!errors.email)}
+                placeholder="admin@ecomsync.com"
+              />
+              <FieldError message={errors.email} />
             </div>
 
-            {/* Password */}
+            {/* ── Password ── */}
             <div>
               <label className="mb-2 block text-xs font-semibold tracking-wider text-slate-500 uppercase">Password</label>
-              <input type="password" required value={password} onChange={(e) => setPassword(e.target.value)} className="block w-full rounded-lg border border-slate-700 bg-slate-950 px-4 py-3 text-white transition-all focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 focus:outline-none" placeholder="••••••••" />
+              <div className="relative">
+                <input
+                  type={showPassword ? 'text' : 'password'}
+                  value={password}
+                  onChange={(e) => {
+                    setPassword(e.target.value);
+                    clearError('password');
+                  }}
+                  className={`${inputCls(!!errors.password)} pr-12`}
+                  placeholder="••••••••"
+                />
+                <button type="button" onClick={() => setShowPassword((p) => !p)} aria-label={showPassword ? 'Hide password' : 'Show password'} className="absolute inset-y-0 right-0 flex items-center pr-4 text-slate-400 transition-colors hover:text-white">
+                  {showPassword ? <PiEyeSlash size={18} /> : <PiEye size={18} />}
+                </button>
+              </div>
+              <FieldError message={errors.password} />
             </div>
 
-            {/* Confirm Password (Signup Only) */}
-            {!isLogin && (
-              <div className="animate-in fade-in slide-in-from-top-2 duration-300">
-                <label className="mb-2 block text-xs font-semibold tracking-wider text-slate-500 uppercase">Confirm Password</label>
-                <input type="password" required value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} className={`block w-full rounded-lg border bg-slate-950 px-4 py-3 text-white transition-all focus:outline-none ${confirmPassword && confirmPassword !== password ? 'border-red-500 focus:border-red-500 focus:ring-1 focus:ring-red-500' : 'border-slate-700 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500'}`} placeholder="••••••••" />
-                {confirmPassword && confirmPassword !== password && <p className="mt-1 text-xs text-red-400">Passwords do not match</p>}
+            {/* Forgot password (login only) */}
+            {isLogin && (
+              <div className="-mt-2 text-right">
+                <Link href="/login/forgot-password" className="text-xs font-medium text-indigo-400 transition-colors hover:text-indigo-300 hover:underline">
+                  Forgot password?
+                </Link>
               </div>
             )}
 
-            {/* Submit Button */}
+            {/* ── Confirm password (sign-up only) ── */}
+            {!isLogin && (
+              <div className="animate-in fade-in slide-in-from-top-2 duration-300">
+                <label className="mb-2 block text-xs font-semibold tracking-wider text-slate-500 uppercase">Confirm Password</label>
+                <div className="relative">
+                  <input
+                    type={showConfirm ? 'text' : 'password'}
+                    value={confirmPassword}
+                    onChange={(e) => {
+                      setConfirmPassword(e.target.value);
+                      clearError('confirmPassword');
+                    }}
+                    className={`${inputCls(!!errors.confirmPassword)} pr-12`}
+                    placeholder="••••••••"
+                  />
+                  <button type="button" onClick={() => setShowConfirm((p) => !p)} aria-label={showConfirm ? 'Hide confirm password' : 'Show confirm password'} className="absolute inset-y-0 right-0 flex items-center pr-4 text-slate-400 transition-colors hover:text-white">
+                    {showConfirm ? <PiEyeSlash size={18} /> : <PiEye size={18} />}
+                  </button>
+                </div>
+                <FieldError message={errors.confirmPassword} />
+              </div>
+            )}
+
+            {/* ── Submit ── */}
             <div className="pt-2">
               <button type="submit" disabled={isLoading} className="group relative flex w-full justify-center rounded-lg bg-indigo-600 px-4 py-3 text-sm font-semibold text-white shadow-lg transition-all hover:bg-indigo-500 hover:shadow-indigo-500/30 focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 focus:ring-offset-slate-900 focus:outline-none disabled:cursor-not-allowed disabled:opacity-50">
                 {isLoading ? (
                   <span className="flex items-center gap-2">
-                    <svg className="h-5 w-5 animate-spin text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    <svg className="h-5 w-5 animate-spin" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
                     </svg>
-                    Processing...
+                    Processing…
                   </span>
                 ) : isLogin ? (
                   'Sign In'
@@ -196,34 +335,25 @@ export default function LoginPage() {
             </div>
           </form>
 
-          {/* Toggle Link */}
+          {/* Toggle login / sign-up */}
           <div className="mt-6 border-t border-slate-800 pt-4 text-center">
             <p className="text-sm text-slate-400">
-              {isLogin ? 'New to EcommSync? ' : 'Already have an account? '}
+              {isLogin ? 'New to EcomSync? ' : 'Already have an account? '}
               <button
                 type="button"
                 onClick={() => {
-                  setIsLogin(!isLogin);
-                  // Clear sensitivity fields on toggle
+                  setIsLogin((p) => !p);
                   setPassword('');
                   setConfirmPassword('');
+                  setErrors({});
                 }}
                 className="font-medium text-indigo-400 transition-colors hover:text-indigo-300 hover:underline focus:outline-none">
                 {isLogin ? 'Sign up now' : 'Sign in'}
               </button>
             </p>
-
-            {/* Forgot password */}
-            {isLogin && (
-              <p className="text-sm text-slate-400">
-                <Link href="/login/forgot-password" className="font-medium text-indigo-400 transition-colors hover:text-indigo-300 hover:underline focus:outline-none">
-                  Forgot password?
-                </Link>
-              </p>
-            )}
           </div>
 
-          {/* Google Button */}
+          {/* Google OAuth */}
           <div className="mt-6 border-t border-slate-800 pt-4 text-center">
             <GoogleButton />
           </div>

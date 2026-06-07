@@ -14,7 +14,13 @@ import { STORE_ADDED, STORE_ADD_FAILED, STORE_DELETED, STORE_DELETE_FAILED } fro
 import { getKeyPattern, isDuplicateError } from '@/lib/utils';
 import { trackEvent } from '../posthog/helpers';
 
-// --- Types ---
+// Types
+import { StoreStats } from '@/types';
+
+// ---------------------------------------------------------------------------
+// Types
+// ---------------------------------------------------------------------------
+
 export interface AddStoreParams {
   userId: string;
   name: string;
@@ -23,10 +29,66 @@ export interface AddStoreParams {
   config: Record<string, unknown>;
 }
 
-// --- Zod Schemas (The Bouncer) ---
+/** Shape of per-field credential errors returned to the client. */
+export type StoreFieldErrors = Partial<Record<'name' | 'storeUrl' | 'accessToken' | 'apiKey' | 'consumerKey' | 'consumerSecret', string>>;
+
+// ---------------------------------------------------------------------------
+// Zod Schemas — Platform-specific credential validation
+// ---------------------------------------------------------------------------
+
 const ShopifyConfigSchema = z.object({ storeUrl: z.url(), accessToken: z.string().min(10) });
 const AmazonConfigSchema = z.object({ apiKey: z.string().min(5), endpoint: z.enum(['US', 'EU']) });
-const WooCommerceConfigSchema = z.object({ storeUrl: z.url(), consumerKey: z.string().startsWith('ck_'), consumerSecret: z.string().startsWith('cs_') });
+const WooCommerceConfigSchema = z.object({
+  storeUrl: z.url(),
+  consumerKey: z.string().startsWith('ck_'),
+  consumerSecret: z.string().startsWith('cs_'),
+});
+
+// ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
+
+/**
+ * Runtime shape of the object returned by `z.treeifyError`.
+ * Zod's TS declarations are looser than the actual runtime value,
+ * so we define this locally and cast to it.
+ */
+interface ZodErrorTree {
+  errors: string[];
+  properties?: Record<string, { errors: string[] }>;
+}
+
+/**
+ * Converts a ZodError into a flat `{ field: firstErrorMessage }` map,
+ * then replaces Zod's technical messages with user-friendly copy.
+ *
+ * Uses `z.treeifyError` (Zod v4+) which returns:
+ *   `{ errors: string[], properties: { [field]: { errors: string[] } } }`
+ */
+function extractFieldErrors(error: z.ZodError): StoreFieldErrors {
+  const tree = z.treeifyError(error) as ZodErrorTree;
+  const errs: StoreFieldErrors = {};
+
+  // Pull the first error message from each field node in the tree
+  for (const [field, node] of Object.entries(tree.properties ?? {})) {
+    if (node.errors.length > 0) {
+      (errs as Record<string, string>)[field] = node.errors[0];
+    }
+  }
+
+  // Replace Zod's generic messages with actionable copy
+  if (errs.storeUrl) errs.storeUrl = 'Store URL must be a valid URL (e.g. https://mystore.myshopify.com).';
+  if (errs.accessToken) errs.accessToken = 'Access token must be at least 10 characters.';
+  if (errs.apiKey) errs.apiKey = 'API key must be at least 5 characters.';
+  if (errs.consumerKey) errs.consumerKey = 'Consumer key must start with "ck_".';
+  if (errs.consumerSecret) errs.consumerSecret = 'Consumer secret must start with "cs_".';
+
+  return errs;
+}
+
+// ---------------------------------------------------------------------------
+// addStore
+// ---------------------------------------------------------------------------
 
 export async function addStore(params: AddStoreParams) {
   const { userId, name, platform, config, isSyncEnabled } = params;
@@ -38,23 +100,32 @@ export async function addStore(params: AddStoreParams) {
     // 2. Platform-Specific Validation & Identity Extraction
     let configValidation;
 
-    // Shopify
     if (platform === EPlatform.SHOPIFY) configValidation = ShopifyConfigSchema.safeParse(config);
-    // Amazon
     else if (platform === EPlatform.AMAZON) configValidation = AmazonConfigSchema.safeParse(config);
-    // WooCommerce
     else if (platform === EPlatform.WOOCOMMERCE) configValidation = WooCommerceConfigSchema.safeParse(config);
-    // Invalid Platform
     else return { success: false, message: 'Invalid platform selected.' };
 
-    // 3. Check Credentials
-    if (!configValidation.success) return { success: false, message: `Invalid credentials for ${platform}.` };
+    // 3. Return field-level errors so the UI can highlight the exact broken fields
+    if (!configValidation.success) {
+      return {
+        success: false,
+        message: `Invalid credentials for ${platform}.`,
+        fieldErrors: extractFieldErrors(configValidation.error),
+      };
+    }
 
     // 4. Connect to DB
     await connectDB();
 
     // 5. Create Store
-    const newStore = await Store.create({ userId: new Types.ObjectId(userId), name, platform, config: configValidation.data, isSyncEnabled, isConnected: false });
+    const newStore = await Store.create({
+      userId: new Types.ObjectId(userId),
+      name,
+      platform,
+      config: configValidation.data,
+      isSyncEnabled,
+      isConnected: false,
+    });
 
     // 6. Track the event in PostHog
     trackEvent(userId, STORE_ADDED, { storeId: newStore._id.toString(), platform });
@@ -64,38 +135,41 @@ export async function addStore(params: AddStoreParams) {
   } catch (error) {
     console.error('🚩 ADD_STORE_ERROR:', error);
     let message = 'Failed to add store.';
+    let fieldErrors: StoreFieldErrors | undefined;
 
-    // --- 1. The Duplicate Key Handler ---
-    // Logic: MongoDB throws code 11000 when a unique index is violated.
-    // We have a compound index on { userId: 1, name: 1 }
     if (isDuplicateError(error)) {
       const pattern = getKeyPattern(error);
-      if (pattern?.config?.storeUrl) message = 'This store is already connected.';
-      if (pattern?.name) message = 'You already have a store with this nickname.';
+      if (pattern?.config?.storeUrl) {
+        message = 'A store with this URL is already connected.';
+        fieldErrors = { storeUrl: 'A store with this URL is already connected.' };
+      }
+      if (pattern?.name) {
+        message = 'You already have a store with this nickname.';
+        fieldErrors = { name: 'You already have a store with this nickname.' };
+      }
     }
 
-    // --- 2. PostHog Error Tracking ---
     trackEvent(userId, STORE_ADD_FAILED, { error: message });
-
-    // --- 3. The Generic Error Handler ---
-    return { success: false, message };
+    return { success: false, message, ...(fieldErrors && { fieldErrors }) };
   }
 }
+
+// ---------------------------------------------------------------------------
+// getStoresByUserId
+// ---------------------------------------------------------------------------
 
 export async function getStoresByUserId({ userId }: { userId: string }) {
   try {
     // 1. Connect to DB
     await connectDB();
 
-    // 2. Fetch stores
+    // 2. Fetch stores (exclude sensitive config)
     const stores = await Store.find({ userId: new Types.ObjectId(userId) })
       .select('-config')
       .sort({ createdAt: -1 })
       .lean();
 
-    // 3. Return stores
-    // Next.js Serialization Fix:
-    // Mongoose IDs are objects. Convert to string to avoid "Client Component" warnings.
+    // 3. Serialize Mongoose ObjectIds to plain strings
     const sanitizedStores = JSON.parse(JSON.stringify(stores));
     return { success: true, message: 'Stores fetched successfully!', stores: sanitizedStores };
   } catch (error) {
@@ -104,13 +178,85 @@ export async function getStoresByUserId({ userId }: { userId: string }) {
   }
 }
 
+// ---------------------------------------------------------------------------
+// getStoreStats
+// ---------------------------------------------------------------------------
+
+/**
+ * Computes aggregated store statistics for a user in a single MongoDB
+ * aggregation pipeline — no N+1, no multiple round-trips.
+ *
+ * Returns counts per platform plus the number of connected/synced stores.
+ *
+ * @param userId - The authenticated user's MongoDB ObjectId string.
+ */
+export async function getStoreStats({ userId }: { userId: string }): Promise<{ success: boolean; message: string; stats?: StoreStats }> {
+  try {
+    // 1. Connect to DB
+    await connectDB();
+
+    /*
+     * 2. Single aggregation pipeline:
+     *    - $match  → scope to this user's stores only
+     *    - $group  → accumulate all counters in one pass over the collection
+     *
+     * Each $cond acts as a conditional counter:
+     *   { $cond: [<boolean expression>, 1, 0] }
+     * Summing these gives us the count of documents where the condition is true.
+     */
+    const [result] = await Store.aggregate<StoreStats & { _id: null }>([
+      {
+        $match: { userId: new Types.ObjectId(userId) },
+      },
+      {
+        $group: {
+          _id: null,
+          shopify: { $sum: { $cond: [{ $eq: ['$platform', EPlatform.SHOPIFY] }, 1, 0] } },
+          amazon: { $sum: { $cond: [{ $eq: ['$platform', EPlatform.AMAZON] }, 1, 0] } },
+          woocommerce: { $sum: { $cond: [{ $eq: ['$platform', EPlatform.WOOCOMMERCE] }, 1, 0] } },
+          connected: { $sum: { $cond: ['$isConnected', 1, 0] } },
+          synced: { $sum: { $cond: ['$isSyncEnabled', 1, 0] } },
+        },
+      },
+      {
+        // Drop the internal _id field — callers don't need it
+        $project: { _id: 0 },
+      },
+    ]);
+
+    /*
+     * 3. If the user has no stores yet, the $group stage produces no documents.
+     *    Fall back to all-zeros so the UI always has a valid shape to render.
+     */
+    const stats: StoreStats = result ?? {
+      shopify: 0,
+      amazon: 0,
+      woocommerce: 0,
+      connected: 0,
+      synced: 0,
+    };
+
+    return { success: true, message: 'Stats fetched successfully!', stats };
+  } catch (error) {
+    console.error('🚩 GET_STORE_STATS_ERROR:', error);
+    return { success: false, message: 'Failed to fetch store stats.' };
+  }
+}
+
+// ---------------------------------------------------------------------------
+// deleteStoreById
+// ---------------------------------------------------------------------------
+
 export async function deleteStoreById({ storeId, userId }: { storeId: string; userId: string }) {
   try {
     // 1. Connect to DB
     await connectDB();
 
     // 2. Delete store
-    const result = await Store.deleteOne({ _id: new Types.ObjectId(storeId), userId: new Types.ObjectId(userId) });
+    const result = await Store.deleteOne({
+      _id: new Types.ObjectId(storeId),
+      userId: new Types.ObjectId(userId),
+    });
     if (!result.deletedCount) return { success: false, message: 'Store not found or access denied.' };
 
     // 3. Track the event in PostHog
@@ -121,14 +267,14 @@ export async function deleteStoreById({ storeId, userId }: { storeId: string; us
   } catch (error) {
     console.error('🚩 DELETE_STORE_ERROR:', error);
     const message = 'Failed to delete store.';
-
-    // 1. Post Hog error tracking
     trackEvent(userId, STORE_DELETE_FAILED, { error: message });
-
-    // 2. Error response
     return { success: false, message };
   }
 }
+
+// ---------------------------------------------------------------------------
+// editStoreById
+// ---------------------------------------------------------------------------
 
 export async function editStoreById({ storeId, userId, name, config, isSyncEnabled }: { storeId: string; userId: string; name?: string; config?: Record<string, unknown>; isSyncEnabled?: boolean }) {
   try {
@@ -138,41 +284,55 @@ export async function editStoreById({ storeId, userId, name, config, isSyncEnabl
     // 2. Connect to DB
     await connectDB();
 
-    // 3. Get the store
-    const store = await Store.findOne({ _id: new Types.ObjectId(storeId), userId: new Types.ObjectId(userId) }).select('-config');
+    // 3. Get the store (needed to know its platform for validation)
+    const store = await Store.findOne({
+      _id: new Types.ObjectId(storeId),
+      userId: new Types.ObjectId(userId),
+    }).select('-config');
     if (!store) return { success: false, message: 'Store not found or access denied.' };
 
-    // 4. Validate the config fields
-    if (config) {
+    // 4. Strip blank values before validation AND before the DB update.
+    //    Empty string = "leave blank to keep current" — treat as if the key
+    //    was never sent. This must happen here so Zod's partial schemas never
+    //    see an empty string for a url/startsWith field.
+    const nonEmptyConfig = config ? Object.fromEntries(Object.entries(config).filter(([, v]) => v !== undefined && v !== null && v !== '')) : undefined;
+
+    // 5. Validate only the non-blank credential fields (partial — edit mode)
+    if (nonEmptyConfig && Object.keys(nonEmptyConfig).length > 0) {
       let configValidation;
 
-      if (store.platform === EPlatform.SHOPIFY) configValidation = ShopifyConfigSchema.partial().safeParse(config);
-      else if (store.platform === EPlatform.AMAZON) configValidation = AmazonConfigSchema.partial().safeParse(config);
-      else if (store.platform === EPlatform.WOOCOMMERCE) configValidation = WooCommerceConfigSchema.partial().safeParse(config);
+      if (store.platform === EPlatform.SHOPIFY) configValidation = ShopifyConfigSchema.partial().safeParse(nonEmptyConfig);
+      else if (store.platform === EPlatform.AMAZON) configValidation = AmazonConfigSchema.partial().safeParse(nonEmptyConfig);
+      else if (store.platform === EPlatform.WOOCOMMERCE) configValidation = WooCommerceConfigSchema.partial().safeParse(nonEmptyConfig);
       else return { success: false, message: 'Invalid platform selected.' };
 
-      if (!configValidation.success) return { success: false, message: `Incorrect credential fields for ${store.platform}.` };
+      // Return field-level errors so the UI can highlight the exact broken fields
+      if (!configValidation.success) {
+        return {
+          success: false,
+          message: `Incorrect credential fields for ${store.platform}.`,
+          fieldErrors: extractFieldErrors(configValidation.error),
+        };
+      }
     }
 
-    // 5. Build the update object
+    // 6. Build the $set update object
     const updateFields: Record<string, unknown> = {};
     if (name) updateFields.name = name;
     if (isSyncEnabled !== undefined) updateFields.isSyncEnabled = isSyncEnabled;
 
-    // 💡 Don't set 'config' directly. Set 'config.key'
-    if (config) {
-      Object.keys(config).forEach((key) => {
-        const value = config[key] as string | null | undefined;
-        // Only update if value is not empty/null
-        if (![undefined, '', null].includes(value)) updateFields[`config.${key}`] = value; // 👈 "config.shopUrl" merges safely
+    // Use dot-notation for nested config keys so we merge rather than overwrite
+    if (nonEmptyConfig) {
+      Object.keys(nonEmptyConfig).forEach((key) => {
+        updateFields[`config.${key}`] = nonEmptyConfig[key];
       });
     }
 
-    // 5. Edit store
+    // 7. Apply update
     const res = await Store.updateOne({ _id: new Types.ObjectId(storeId), userId: new Types.ObjectId(userId) }, { $set: updateFields });
     if (!res.modifiedCount) return { success: false, message: 'Store not found, access denied or no changes made.' };
 
-    // 6. Return success
+    // 7. Return success
     return { success: true, message: 'Store edited successfully!' };
   } catch (error) {
     console.error('🚩 EDIT_STORE_ERROR:', error);

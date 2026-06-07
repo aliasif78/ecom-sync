@@ -4,65 +4,73 @@ import User from '@/database/models/User';
 import Product from '@/database/models/Product';
 
 // Supabase
-import { createAdminClient } from '../supabase/admin'; // For executing high-privilege commands
-import { createClient } from '../supabase/server'; // For checking WHO is making the request
+import { createAdminClient } from '../supabase/admin';
+import { createClient } from '../supabase/server';
 
 // Constants
 import { VERIFIED, NOT_VERIFIED, MUTEX_ALL } from '../globalConstants';
 
-// Helpers
+// ---------------------------------------------------------------------------
+// Private helpers
+// ---------------------------------------------------------------------------
+
+/**
+ * Returns the currently authenticated Supabase user, or `null` if there is
+ * no active session.
+ *
+ * Design note: this function intentionally returns `null` rather than
+ * throwing.  A missing session is an *expected* outcome (e.g. post-logout),
+ * not an exceptional error.  Throwing here caused Next.js 16 + Turbopack to
+ * forward the error to the browser DevTools as a red `console.error`, even
+ * though the middleware had already issued a redirect.
+ */
 const getCurrentSbUser = async () => {
   const supabase = await createClient();
   const { data } = await supabase.auth.getUser();
-  const currentUser = data?.user;
-
-  if (!currentUser) throw new Error('Unauthorized: No session');
-  return currentUser;
+  return data?.user ?? null;
 };
 
+/**
+ * Asserts that the current request is authenticated AND that the caller has
+ * sufficient privileges (self or admin).
+ *
+ * @throws {Error} when the session is missing or permissions are insufficient.
+ */
 const authorizeRequest = async (targetSupabaseId?: string) => {
-  // Get the current user
   const currentUser = await getCurrentSbUser();
+  if (!currentUser) throw new Error('Unauthorized: No session');
 
-  // 2. Check if the user is the one making the request or an admin
   const isSelf = targetSupabaseId ? currentUser.id === targetSupabaseId : false;
   const isAdmin = currentUser.app_metadata?.role === 'admin';
 
-  // 3. The Rule: You must be the user themselves OR an admin
   if (!isSelf && !isAdmin) throw new Error('Unauthorized: Insufficient permissions');
 
-  // 4. Return the authorization result
   return { isAdmin, isSelf };
 };
 
-// Exports
+// ---------------------------------------------------------------------------
+// Public exports
+// ---------------------------------------------------------------------------
+
+/**
+ * Returns all users. Admin-only.
+ */
 export const getAllUsers = async () => {
   try {
-    // 1. Only authorize the admin for this
     const { isAdmin } = await authorizeRequest();
     if (!isAdmin) throw new Error('Unauthorized: Insufficient permissions');
 
-    // 2. Connect to the database
     await connectDB();
 
-    // 3. Get all users
-    const users = await User.find({})
-      .select('name email role createdAt status lastActive createdAt profilePicture') // 👈 ONLY fetch what you need
-      .sort({ createdAt: -1 }) // Newest users first
-      .lean(); // 👈 CRITICAL: Converts to plain JSON, prevents Next.js serialization error
+    const users = await User.find({}).select('name email role createdAt status lastActive createdAt profilePicture').sort({ createdAt: -1 }).lean();
 
-    // 4. Serialization Fix (ObjectId to String)
-    // .lean() leaves _id as new ObjectId("..."), which Next.js also hates.
-    // We map over it to convert _id to string.
     const sanitizedUsers = users.map((user) => ({
       ...user,
       _id: user._id.toString(),
-      // If you have Date objects, they usually pass fine, but sometimes safer to .toISOString() them if you see warnings.
       lastActive: user.lastActive?.toISOString() || 'N/A',
       createdAt: user.createdAt?.toISOString() || 'N/A',
     }));
 
-    // 5. Return the users
     return { success: true, users: sanitizedUsers };
   } catch (error) {
     console.error(error);
@@ -70,30 +78,32 @@ export const getAllUsers = async () => {
   }
 };
 
+/**
+ * Updates a user's name, role, and/or status in both Supabase and MongoDB.
+ */
 export const updateUserById = async (id: string, data: { role?: string; name?: string; status?: string }) => {
-  // Safety Check
   const { name, role, status } = data;
   if (!id || (!name && !role && !status)) return { success: false, error: 'No data provided' };
 
   try {
-    // 1. Connect to the database
     await connectDB();
 
-    // 2. Get the user
     const user = await User.findById(id);
     if (!user) return { success: false, message: 'User not found' };
 
-    // 3. Check authorization
     const { isAdmin } = await authorizeRequest(user.supabaseId);
-    if (role && !isAdmin) return { success: false, message: 'Unauthorized' }; // Only admin can change roles
+    if (role && !isAdmin) return { success: false, message: 'Unauthorized' };
 
-    // 4. Build the user metadata for supabase
-    const supabaseUpdates: { user_metadata?: { full_name?: string }; app_metadata?: { role?: string }; email_confirmed_at?: string | null } = {};
+    const supabaseUpdates: {
+      user_metadata?: { full_name?: string };
+      app_metadata?: { role?: string };
+      email_confirmed_at?: string | null;
+    } = {};
+
     if (name) supabaseUpdates.user_metadata = { full_name: name };
     if (role) supabaseUpdates.app_metadata = { role };
     if (status) supabaseUpdates.email_confirmed_at = status === VERIFIED ? new Date().toISOString() : null;
 
-    // 5. Update in Supabase
     const supabaseAdmin = createAdminClient();
     const { error: supabaseError } = await supabaseAdmin.auth.admin.updateUserById(user.supabaseId, supabaseUpdates);
 
@@ -102,17 +112,14 @@ export const updateUserById = async (id: string, data: { role?: string; name?: s
       return { success: false, message: 'Failed to update user' };
     }
 
-    // 6. Build the update object for the Mongo DB
     const mongoUpdates: { name?: string; role?: string; status?: string } = {};
     if (name) mongoUpdates.name = name;
     if (role) mongoUpdates.role = role;
     if (status) mongoUpdates.status = status;
 
-    // 7. Update in the Mongo DB
     const updatedUser = await User.findByIdAndUpdate(id, mongoUpdates, { new: true });
     if (!updatedUser) return { success: false, message: 'Failed to update user' };
 
-    // 8. Return the updated user
     return { success: true, user: updatedUser };
   } catch (error) {
     console.error(error);
@@ -120,22 +127,20 @@ export const updateUserById = async (id: string, data: { role?: string; name?: s
   }
 };
 
+/**
+ * Hard-deletes a user from both Supabase and MongoDB.
+ */
 export const deleteUserById = async (id: string) => {
-  // Safety Check
   if (!id) return { success: false, error: 'No id provided' };
 
   try {
-    // 1. Connect to the database
     await connectDB();
 
-    // 2. Get the user
     const user = await User.findById(id);
     if (!user) return { success: false, message: 'User not found' };
 
-    // 3. Check authorization
     await authorizeRequest(user.supabaseId);
 
-    // 4. Delete on Supabase
     const supabaseAdmin = createAdminClient();
     const { error: supabaseError } = await supabaseAdmin.auth.admin.deleteUser(user.supabaseId);
 
@@ -144,10 +149,7 @@ export const deleteUserById = async (id: string) => {
       return { success: false, message: 'Failed to delete user' };
     }
 
-    // 5. Delete on Mongo DB
     const deletedUser = await User.findByIdAndDelete(id);
-
-    // 6. Return the deleted user
     return { success: true, user: deletedUser };
   } catch (error) {
     console.error(error);
@@ -155,69 +157,78 @@ export const deleteUserById = async (id: string) => {
   }
 };
 
+/**
+ * Syncs the user's verification status and last-active timestamp from
+ * Supabase into MongoDB.  Called after login.
+ */
 export const syncUserStatus = async (mongoId: string, supabaseId: string) => {
   const supabase = createAdminClient();
 
-  // 1. Ask Supabase for the TRUTH
   const { data, error } = await supabase.auth.admin.getUserById(supabaseId);
   const { user } = data;
   if (error || !user) return;
 
-  // 2. Determine Status
   const realStatus = user.email_confirmed_at ? VERIFIED : NOT_VERIFIED;
   const realLastActive = user.last_sign_in_at ? new Date(user.last_sign_in_at) : new Date();
 
-  // 3. Update Mongo blindly (it's fast/cheap)
   await User.findByIdAndUpdate(mongoId, { status: realStatus, lastActive: realLastActive });
   return realStatus;
 };
 
+/**
+ * Returns the currently authenticated user from MongoDB.
+ *
+ * Returns `{ success: false }` — without logging — when there is no active
+ * session.  A missing session is an expected state (e.g. immediately after
+ * logout), not a system error, so we must not emit `console.error` here.
+ * True system faults (DB down, etc.) still log at the `error` level.
+ */
 export const getCurrentUser = async () => {
   try {
-    // ⚡ THE CRITICAL FIX: Establish connection first!
     await connectDB();
 
-    // 1. Get the current user logged into supabase
+    // `getCurrentSbUser` now returns null instead of throwing on no-session.
     const supabaseUser = await getCurrentSbUser();
 
-    // 2. Use the supabase id to find the user in the mongo db
-    const user = await User.findOne({ supabaseId: supabaseUser.id });
-    if (!user) return { success: false, message: 'User not found in mongo db' };
+    if (!supabaseUser) {
+      // Expected path after logout — silent, no console noise.
+      return { success: false, message: 'No active session' };
+    }
 
-    // 3. Return the current user
+    const user = await User.findOne({ supabaseId: supabaseUser.id });
+    if (!user) return { success: false, message: 'User not found in database' };
+
     return { success: true, user };
   } catch (error) {
-    console.error(error);
+    // Only true unexpected faults reach here (e.g. DB connection failure).
+    console.error('🚩 GET_CURRENT_USER_ERROR:', error);
     return { success: false, message: 'Failed to get current user' };
   }
 };
 
+/**
+ * Adds one or more SKUs to the user's `isSyncing` mutex array.
+ * Pass `MUTEX_ALL` to lock every product belonging to the user.
+ */
 export const addSyncMutex = async (userId: string, lockId: string) => {
-  // 1. Establish database connection
   await connectDB();
 
-  // 2. Determine the updated array state
-  // An individual product needs to be synced
-  if (lockId !== MUTEX_ALL) return await User.findByIdAndUpdate(userId, { $addToSet: { isSyncing: lockId } }, { new: true });
+  if (lockId !== MUTEX_ALL) {
+    return await User.findByIdAndUpdate(userId, { $addToSet: { isSyncing: lockId } }, { new: true });
+  }
 
-  // All products need to be synced
-  // A. Fetch all the product SKUs belonging to this user from the database
+  // Lock all products for this user
   const products = await Product.find({ userId }).select('sku');
   if (!products.length) return;
 
   const productSKUs = products.map((product) => product.sku);
-
-  // B. Add all of them to the isSyncing array
   return await User.findByIdAndUpdate(userId, { $addToSet: { isSyncing: { $each: productSKUs } } }, { new: true });
 };
 
+/**
+ * Removes a single SKU from the user's `isSyncing` mutex array.
+ */
 export const removeSyncMutex = async (userId: string, unlockId: string) => {
-  // 1. Establish database connection
   await connectDB();
-
-  // 2. Pull the product SKU out of the isSyncing array
-  const query = { $pull: { isSyncing: unlockId } };
-
-  // 3. Update the user
-  return await User.findByIdAndUpdate(userId, query, { new: true });
+  return await User.findByIdAndUpdate(userId, { $pull: { isSyncing: unlockId } }, { new: true });
 };

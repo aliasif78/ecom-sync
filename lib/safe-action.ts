@@ -9,74 +9,102 @@ import { getCurrentUser } from './users';
 import PostHogClient from './posthog';
 import { CHAOS_MODE_ERROR } from './posthog/constants';
 
-// --- Types ---
-// 🟢 NEW: Flexible. Allows any keys you want.
-// We use 'Partial<T>' so that when errors happen, we don't need to return empty data.
-export type ActionResponse<T = unknown> = { success: boolean; message: string } & Partial<T>;
+// ---------------------------------------------------------------------------
+// Types
+// ---------------------------------------------------------------------------
 
 /**
- * A standardized wrapper for all Server Actions.
- * Handles Authentication, Error Logging, and Revalidation.
+ * Standardized envelope returned by every Server Action.
+ * Uses `Partial<T>` so failure paths don't need to supply empty data fields.
  */
-export async function authGuard<T>(
-  tag: string, // e.g. "ADD_STORE"
-  path: string | null, // e.g. "/stores" (pass null to skip revalidate)
-  fn: (userId: string) => Promise<ActionResponse<T>> // The actual business logic
-): Promise<ActionResponse<T>> {
+export type ActionResponse<T = unknown> = { success: boolean; message: string } & Partial<T>;
+
+// ---------------------------------------------------------------------------
+// authGuard
+// ---------------------------------------------------------------------------
+
+/**
+ * Centralised wrapper for all Server Actions.
+ *
+ * Responsibilities (in order):
+ *  1. Authentication — rejects unauthenticated callers without noise
+ *  2. Chaos Mode     — random failure injection for resilience testing
+ *  3. Business Logic — delegates to the provided `fn` callback
+ *  4. Revalidation   — invalidates the Next.js cache for the given path
+ *
+ * Log-level contract:
+ *  - `console.warn`  → expected non-error outcomes (no session, logic failures)
+ *  - `console.error` → true system faults (DB down, unhandled exception)
+ *
+ * This distinction matters in Next.js 16 + Turbopack: server `console.error`
+ * calls are forwarded to the browser DevTools as red errors.  Auth failures
+ * after logout are *expected* — they must not appear as red console errors.
+ *
+ * @param tag  - Identifies the action in logs, e.g. "ADD_STORE"
+ * @param path - Next.js path to revalidate on success, or `null` to skip
+ * @param fn   - Business logic receiving the authenticated userId
+ */
+export async function authGuard<T>(tag: string, path: string | null, fn: (userId: string) => Promise<ActionResponse<T>>): Promise<ActionResponse<T>> {
   try {
-    // 1. Centralized Auth
+    // ── 1. Auth check ────────────────────────────────────────────────────────
     const { success, user, message } = await getCurrentUser();
 
     if (!success || !user) {
-      console.error(`🚩 ${tag}_AUTH_ERROR: User not found`);
+      // WARN not ERROR: this is an expected outcome whenever a logged-out user
+      // triggers a server action (e.g. during post-logout page teardown).
+      console.warn(`⚠️  ${tag}_NO_SESSION: ${message ?? 'Unauthenticated'}`);
       return { success: false, message: message || 'Unauthorized' } as ActionResponse<T>;
     }
 
-    // 2. Chaos Mode Check
+    // ── 2. Chaos Mode ────────────────────────────────────────────────────────
     const cookieStore = await cookies();
     const isChaosActive = cookieStore.get('chaos_mode')?.value === 'true';
 
-    // 3. Random Failure Simulation
     if (isChaosActive) {
-      // A) Post Hog - Track the Chaos Strike globally using your Tag
+      // Track the chaos strike in PostHog
       const ph = PostHogClient();
-      ph.capture({ distinctId: user._id.toString(), event: CHAOS_MODE_ERROR, properties: { chaos_mode: true, tag } });
+      ph.capture({
+        distinctId: user._id.toString(),
+        event: CHAOS_MODE_ERROR,
+        properties: { chaos_mode: true, tag },
+      });
       await ph.shutdown();
 
-      // B) Random Failure Simulation
       const rand = Math.random();
 
-      // I) The Hard Crash (HTTP 500)
+      // Hard crash (rare — ~1% of requests)
       if (rand > 0.99) {
-        console.error(`🚩 ${tag}_CHAOS_MODE: Simulated hard crash`);
+        console.warn(`🐒 ${tag}_CHAOS_CRASH: Simulated hard crash`);
         return { success: false, message: '🐒 Simulated hard crash Error' } as ActionResponse<T>;
       }
 
-      // II) The Tarpit (Latency)
-      else {
-        console.error(`🚩 ${tag}_CHAOS_MODE: Simulated latency`);
-        await new Promise((resolve) => setTimeout(resolve, 5000));
-        return { success: false, message: '🐒 Simulated latency Error' } as ActionResponse<T>;
-      }
+      // Tarpit — artificial latency (remaining ~99%)
+      console.warn(`🐒 ${tag}_CHAOS_LATENCY: Simulated 5 s delay`);
+      await new Promise((resolve) => setTimeout(resolve, 5000));
+      return { success: false, message: '🐒 Simulated latency Error' } as ActionResponse<T>;
     }
 
-    // 4. Execute Business Logic (Inject User ID)
+    // ── 3. Business Logic ────────────────────────────────────────────────────
     const result = await fn(user._id.toString());
 
-    // 5. Handle Business Logic Failure
     if (!result.success) {
-      console.error(`🚩 ${tag}_LOGIC_ERROR: ${result.message}`);
-      return result; // Return the specific error from the backend function
+      // WARN not ERROR: a logic failure (e.g. "Store not found") is a handled
+      // business outcome, not an unhandled exception.
+      console.warn(`⚠️  ${tag}_LOGIC_FAILURE: ${result.message}`);
+      return result;
     }
 
-    // 6. Centralized Revalidation
+    // ── 4. Revalidation ──────────────────────────────────────────────────────
     if (path) revalidatePath(path);
 
-    // 7. Success response
     return result;
   } catch (error) {
-    // Catch Unexpected Crashes (e.g. DB connection died)
+    // TRUE system fault — DB connection died, unhandled exception, etc.
+    // This warrants console.error because it is unexpected and actionable.
     console.error(`🚩 ${tag}_CRITICAL_ERROR:`, error);
-    return { success: false, message: `System Error: Failed to execute ${tag}` } as ActionResponse<T>;
+    return {
+      success: false,
+      message: `System Error: Failed to execute ${tag}`,
+    } as ActionResponse<T>;
   }
 }

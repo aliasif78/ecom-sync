@@ -13,85 +13,118 @@ import { createClient } from '@/lib/supabase/server';
 // BE Functions
 import { syncUserStatus } from '@/lib/users';
 
+// ---------------------------------------------------------------------------
+// Constants
+// ---------------------------------------------------------------------------
+
+/**
+ * Substring present in Supabase's error message when a sign-in is attempted
+ * on an account whose email has not yet been confirmed.  Matched
+ * case-insensitively so minor copy changes on Supabase's side don't break it.
+ */
+const EMAIL_NOT_CONFIRMED_SENTINEL = 'email not confirmed';
+
+// ---------------------------------------------------------------------------
+// login
+// ---------------------------------------------------------------------------
+
 export const login = async (formData: LoginFormValues) => {
-  // 1. Destructure form data
   const { email, password } = formData;
 
-  // 2. Are all fields provided?
-  if (!email || !password) return { success: false, error: 'All fields are required' }; // Missing information
+  if (!email || !password) return { success: false, error: 'All fields are required' };
 
   try {
-    // 3. Ask Supabase: "Is this password correct?"
     const supabase = await createClient();
     const { error } = await supabase.auth.signInWithPassword({ email, password });
-    if (error) return { success: false, error: error.message };
 
-    // 4. Find the user by email
+    if (error) {
+      // Surface "email not confirmed" as a distinct flag so the UI renders the
+      // verification screen rather than a generic inline field error.
+      if (error.message.toLowerCase().includes(EMAIL_NOT_CONFIRMED_SENTINEL)) {
+        return { success: false, requiresEmailVerification: true, email } as const;
+      }
+      return { success: false, error: error.message };
+    }
+
     await connectDB();
     const user = await User.findOne({ email });
     if (!user) return { success: false, error: 'User not found' };
 
-    // 5. Sync the user status
     await syncUserStatus(user._id.toString(), user.supabaseId);
 
-    // 6. Authenticated successfully
     return { success: true, user: JSON.parse(JSON.stringify(user)) };
   } catch (error) {
-    // Something went wrong
     console.error(error);
     return { success: false, error };
   }
 };
 
+// ---------------------------------------------------------------------------
+// signUp
+// ---------------------------------------------------------------------------
+
 export const signUp = async (formData: SignUpFormValues) => {
-  // 1. Destructure form data
   const { name, email, password, confirmPassword, stores } = formData;
 
-  // 2. Are all fields provided?
-  if (!name || !email || !password || !confirmPassword || !stores) return { success: false, error: 'All fields are required' }; // Missing information
+  if (!name || !email || !password || !confirmPassword || !stores) return { success: false, error: 'All fields are required' };
 
-  // 3. Check if the passwords match
-  if (password !== confirmPassword) return { success: false, error: 'Passwords do not match' }; // Passwords do not match
+  if (password !== confirmPassword) return { success: false, error: 'Passwords do not match' };
 
   try {
-    // 4. Connect to the database
     await connectDB();
 
-    // 5. Check if the user already exists
-    const user = await User.findOne({ email });
-    if (user) return { success: false, error: 'User already exists' }; // Duplicate
+    // Guard against duplicate accounts before touching Supabase.
+    const existing = await User.findOne({ email });
+    if (existing) return { success: false, error: 'User already exists' };
 
-    // 6. Valid information, create the user in Supabase
     const supabase = await createClient();
-    const { data: authData, error: authError } = await supabase.auth.signUp({ email, password, options: { data: { full_name: name } } });
+    const { data: authData, error: authError } = await supabase.auth.signUp({
+      email,
+      password,
+      options: { data: { full_name: name } },
+    });
 
-    // Something went wrong
     if (authError) return { success: false, error: authError.message };
     if (!authData.user) return { success: false, error: 'Failed to create account' };
 
-    // 7. Create Profile in MongoDB (The Critical Link)
-    // We use the UUID from Supabase (authData.user.id) as the 'supabaseId'
-    const newUser = await User.create({ supabaseId: authData.user.id, name, email, shopify: { shopName: stores.shopify, accessToken: '' }, amazon: { shopName: stores.amazon, accessToken: '' }, woocommerce: { shopName: stores.woocommerce, accessToken: '' } });
+    // Create the MongoDB profile immediately with NOT_VERIFIED status.
+    // syncUserStatus upgrades it to VERIFIED on the user's first login after
+    // they click the confirmation link.
+    await User.create({
+      supabaseId: authData.user.id,
+      name,
+      email,
+      shopify: { shopName: stores.shopify, accessToken: '' },
+      amazon: { shopName: stores.amazon, accessToken: '' },
+      woocommerce: { shopName: stores.woocommerce, accessToken: '' },
+    });
 
-    // 8. User created successfully
-    return { success: true, user: JSON.parse(JSON.stringify(newUser)) };
+    // When Supabase has email confirmation enabled (the default),
+    // email_confirmed_at is null on the newly created user.  Signal this to
+    // the client so it can render the "check your inbox" screen instead of
+    // redirecting to /products (the user isn't logged in yet).
+    if (!authData.user.email_confirmed_at) {
+      return { success: true, requiresEmailVerification: true, email } as const;
+    }
+
+    // Edge-case: Supabase project has email confirmation disabled — the
+    // account is immediately active, proceed to the normal success path.
+    return { success: true, user: JSON.parse(JSON.stringify(authData.user)) };
   } catch (error) {
-    // Something went wrong
     console.error(error);
     return { success: false, error };
   }
 };
 
+// ---------------------------------------------------------------------------
+// logout
+// ---------------------------------------------------------------------------
+
 export const logout = async () => {
   try {
-    // 1. Connect to Supabase
     const supabase = await createClient();
-
-    // 2. Ask Supabase to sign out the user & kill the session
     const { error } = await supabase.auth.signOut();
     if (error) return { success: false, error: error.message };
-
-    // 3. Success
     return { success: true, message: 'Logged out successfully' };
   } catch (error) {
     console.error(error);
@@ -99,47 +132,66 @@ export const logout = async () => {
   }
 };
 
+// ---------------------------------------------------------------------------
+// resendVerificationEmail
+// ---------------------------------------------------------------------------
+
+/**
+ * Resends the Supabase email confirmation link for an unverified account.
+ *
+ * The client enforces a 60-second cooldown via a countdown timer.
+ * Supabase also applies its own platform-level rate limit as a secondary guard.
+ *
+ * @param email - The unverified account's email address.
+ */
+export const resendVerificationEmail = async (email: string) => {
+  if (!email) return { success: false, error: 'Email is required' };
+
+  try {
+    const supabase = await createClient();
+    const { error } = await supabase.auth.resend({ type: 'signup', email });
+    if (error) return { success: false, error: error.message };
+    return { success: true };
+  } catch (error) {
+    console.error(error);
+    return { success: false, error: 'Failed to resend verification email' };
+  }
+};
+
+// ---------------------------------------------------------------------------
 // Forgot Password
-// 1. Send the 6-digit code
+// ---------------------------------------------------------------------------
+
+/**
+ * Sends a 6-digit OTP to the given address for password reset.
+ * shouldCreateUser: false ensures only existing accounts can reset.
+ */
 export async function sendPasswordResetOtp(email: string) {
-  // 1. Connect to Supabase
   const supabase = await createClient();
-
-  // 2. We use signInWithOtp to generate a 6-digit code.
-  // We set shouldCreateUser: false because we only want to reset existing accounts.
-  const { error } = await supabase.auth.signInWithOtp({ email, options: { shouldCreateUser: false } });
-
-  // 3. Handle result
+  const { error } = await supabase.auth.signInWithOtp({
+    email,
+    options: { shouldCreateUser: false },
+  });
   if (error) return { success: false, error: error.message };
   return { success: true };
 }
 
-// 2. Verify the code
+/** Verifies the 6-digit OTP. If valid, Supabase establishes a session. */
 export async function verifyOtp(email: string, token: string) {
-  // 1. Connect to Supabase
   const supabase = await createClient();
-
-  // 2. Verify the OTP. If valid, Supabase creates a Session for this user.
   const { error } = await supabase.auth.verifyOtp({ email, token, type: 'email' });
-
-  // 3. Handle result
   if (error) return { success: false, error: error.message };
   return { success: true };
 }
 
-// 3. Update the password (Must be called AFTER verifyOtp)
+/**
+ * Updates the user's password.  Must be called AFTER a successful verifyOtp.
+ * Signs out immediately after to invalidate the temporary OTP-granted session.
+ */
 export async function updatePassword(password: string) {
-  // 1. Connect to Supabase
   const supabase = await createClient();
-
-  // 2. Since we verified the OTP in step 2, we have a session.
-  // We can now securely update the password.
   const { error } = await supabase.auth.updateUser({ password });
-
-  // 3. Force a clean sign out so the invalid session doesn't crash the response
   await supabase.auth.signOut();
-
-  // 4. Handle result
   if (error) return { success: false, error: error.message };
   return { success: true };
 }

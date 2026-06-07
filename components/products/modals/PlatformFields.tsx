@@ -7,33 +7,58 @@ import { ModalInput, ModalSelect } from '@/components/products/modals/Atoms';
 // Types
 import { StoreFormState } from '@/types';
 
-// Interfaces
+// ---------------------------------------------------------------------------
+// Types
+// ---------------------------------------------------------------------------
+
 interface PlatformFieldsProps {
   platform: EPlatform;
-  data: StoreFormState; // Holds formData or credentials
+  /** Holds formData (create) or credentials (edit). */
+  data: StoreFormState;
   onChange: (field: string, value: string) => void;
   mode: 'create' | 'edit';
+  /**
+   * Per-field validation errors keyed by field name.
+   * Each `ModalInput` receives its own error slice.
+   */
+  errors?: Record<string, string>;
 }
 
-export const PlatformFields = ({ platform, data, onChange, mode }: PlatformFieldsProps) => {
+// ---------------------------------------------------------------------------
+// Component
+// ---------------------------------------------------------------------------
+
+/**
+ * Renders the platform-specific credential fields for AddStoreModal /
+ * EditStoreModal. Accepts an `errors` map so each field can display its
+ * own inline validation message.
+ */
+export const PlatformFields = ({ platform, data, onChange, mode, errors = {} }: PlatformFieldsProps) => {
   const isEdit = mode === 'edit';
 
-  // Helper to generate dynamic props based on mode
-  const getFieldProps = (label: string, placeholder: string) => ({ label, placeholder: isEdit ? 'Leave blank to keep current' : placeholder, className: 'font-mono text-sm' });
+  /**
+   * Generates shared props for every credential input.
+   * In edit mode the placeholder signals the field is optional.
+   */
+  const fieldProps = (label: string, placeholder: string) => ({
+    label,
+    placeholder: isEdit ? 'Leave blank to keep current' : placeholder,
+    className: 'font-mono text-sm' as string,
+  });
 
   switch (platform) {
     case EPlatform.SHOPIFY:
       return (
         <>
-          <ModalInput {...getFieldProps('Store Url', 'e.g. my-brand.myshopify.com')} value={data.storeUrl || ''} onChange={(e) => onChange('storeUrl', e.target.value)} />
-          <ModalInput {...getFieldProps('Access Token', 'shpat_xxxxxxxxxxxxxxxx')} value={data.accessToken || ''} onChange={(e) => onChange('accessToken', e.target.value)} />
+          <ModalInput {...fieldProps('Store URL', 'e.g. my-brand.myshopify.com')} error={errors.storeUrl} value={data.storeUrl || ''} onChange={(e) => onChange('storeUrl', e.target.value)} />
+          <ModalInput {...fieldProps('Access Token', 'shpat_xxxxxxxxxxxxxxxx')} error={errors.accessToken} value={data.accessToken || ''} onChange={(e) => onChange('accessToken', e.target.value)} />
         </>
       );
 
     case EPlatform.AMAZON:
       return (
         <>
-          <ModalInput {...getFieldProps('API Key', 'AMZN-MOCK-KEY-...')} value={data.apiKey || ''} onChange={(e) => onChange('apiKey', e.target.value)} />
+          <ModalInput {...fieldProps('API Key', 'AMZN-MOCK-KEY-...')} error={errors.apiKey} value={data.apiKey || ''} onChange={(e) => onChange('apiKey', e.target.value)} />
           <ModalSelect
             label={isEdit ? 'Update Region' : 'Marketplace Region'}
             value={data.endpoint || 'US'}
@@ -49,13 +74,13 @@ export const PlatformFields = ({ platform, data, onChange, mode }: PlatformField
     case EPlatform.WOOCOMMERCE:
       return (
         <>
-          <ModalInput {...getFieldProps('Store URL', 'https://my-wordpress-site.com')} value={data.storeUrl || ''} onChange={(e) => onChange('storeUrl', e.target.value)} />
+          <ModalInput {...fieldProps('Store URL', 'https://my-wordpress-site.com')} error={errors.storeUrl} value={data.storeUrl || ''} onChange={(e) => onChange('storeUrl', e.target.value)} />
           <div className="flex gap-3">
             <div className="flex-1">
-              <ModalInput {...getFieldProps('Consumer Key', 'ck_xxxx...')} value={data.consumerKey || ''} onChange={(e) => onChange('consumerKey', e.target.value)} />
+              <ModalInput {...fieldProps('Consumer Key', 'ck_xxxx...')} error={errors.consumerKey} value={data.consumerKey || ''} onChange={(e) => onChange('consumerKey', e.target.value)} />
             </div>
             <div className="flex-1">
-              <ModalInput {...getFieldProps('Consumer Secret', 'cs_xxxx...')} value={data.consumerSecret || ''} onChange={(e) => onChange('consumerSecret', e.target.value)} />
+              <ModalInput {...fieldProps('Consumer Secret', 'cs_xxxx...')} error={errors.consumerSecret} value={data.consumerSecret || ''} onChange={(e) => onChange('consumerSecret', e.target.value)} />
             </div>
           </div>
         </>

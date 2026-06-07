@@ -18,49 +18,74 @@ import { ProductRow, InventoryReason } from '@/types';
 import { MANUAL } from '@/lib/globalConstants';
 import { SYNC_PRODUCT_CLICKED } from '@/lib/posthog/constants';
 
+// ---------------------------------------------------------------------------
+// Types
+// ---------------------------------------------------------------------------
+
+type FormErrors = Partial<Record<'newStock', string>>;
+
+// ---------------------------------------------------------------------------
+// Validation
+// ---------------------------------------------------------------------------
+
+/**
+ * Validates the Sync Stock form client-side.
+ * Returns a map of field → error message, or null if all fields are valid.
+ */
+function validate(newStock: string, currentStock: number): FormErrors | null {
+  const errs: FormErrors = {};
+
+  if (newStock === '' || Number(newStock) < 0) {
+    errs.newStock = 'Please enter a valid stock quantity (0 or more).';
+  } else if (Number(newStock) === currentStock) {
+    errs.newStock = 'New stock must differ from the current stock level.';
+  }
+
+  return Object.keys(errs).length ? errs : null;
+}
+
+// ---------------------------------------------------------------------------
+// Component
+// ---------------------------------------------------------------------------
+
+/**
+ * Modal for adjusting a product's stock level across all connected stores.
+ * All validation is done client-side first; server errors fall back to a toast.
+ */
 export default function SyncStockModal({ isOpen, onClose, product }: { isOpen: boolean; onClose: () => void; product: ProductRow }) {
-  // States
-  // ✅ Initialize state directly from the prop
-  // Because we add a 'key' in the parent, this line runs fresh every time a new product is selected.
+  // ✅ Initialised from the prop; the parent adds `key={product._id}` so this
+  //    runs fresh every time a different product is selected.
   const [newStock, setNewStock] = useState(product?.stock.toString() || '');
   const [reason, setReason] = useState<InventoryReason>(InventoryReason.MANUAL_ADJUSTMENT);
-  const [isLoading, setIsLoading] = useState(false);
   const [description, setDescription] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
+  const [errors, setErrors] = useState<FormErrors>({});
 
-  // Functions
   const handleSync = async () => {
-    // Record a PostHog event instantly
+    // 1. Fire PostHog event immediately (before any validation)
     posthog.capture(SYNC_PRODUCT_CLICKED, { current_route: '/products' });
 
-    let message;
-
-    // Safety Checks
-    if (!newStock || Number(newStock) < 0) message = 'Please enter a valid stock quantity';
-    if (Number(newStock) === product.stock) message = 'New stock is the same as current stock';
-
-    if (message) {
-      toast.error(message);
+    // 2. Client-side validation
+    const fieldErrors = validate(newStock, product.stock);
+    if (fieldErrors) {
+      setErrors(fieldErrors);
       return;
     }
 
-    // Initiate process
+    // 3. Call server action
     setIsLoading(true);
-
     try {
       const res = await syncProductStock(product._id, Number(newStock), reason, MANUAL, description, product.sku);
 
-      // Error
       if (!res.success) {
-        console.error(res.message);
-        toast.error(res.message || 'Failed to sync stock');
+        toast.error(res.message || 'Failed to sync stock.');
         return;
       }
 
-      // Success
-      toast.info(`Syncing [${product.sku}]'s stock...`);
+      toast.info(`Syncing [${product.sku}]'s stock…`);
       onClose();
     } catch (error) {
-      toast.error('Failed to sync stock');
+      toast.error('Failed to sync stock.');
       console.error('Error syncing stock:', error);
     } finally {
       setIsLoading(false);
@@ -80,13 +105,23 @@ export default function SyncStockModal({ isOpen, onClose, product }: { isOpen: b
       />
 
       <div className="space-y-4">
-        <ModalInput label="New Quantity" type="number" value={newStock} onChange={(e) => setNewStock(e.target.value)} required suffix="units" />
+        <ModalInput
+          label="New Quantity"
+          type="number"
+          min={0}
+          value={newStock}
+          onChange={(e) => {
+            setNewStock(e.target.value);
+            setErrors((prev) => ({ ...prev, newStock: undefined }));
+          }}
+          suffix="units"
+          error={errors.newStock}
+        />
 
         <ModalSelect
           label="Reason"
           value={reason}
           onChange={(e) => setReason(e.target.value as InventoryReason)}
-          required
           options={[
             { value: InventoryReason.MANUAL_ADJUSTMENT, label: 'Manual Adjustment' },
             { value: InventoryReason.RETURN_RESTOCK, label: 'Return Restock' },
@@ -96,7 +131,7 @@ export default function SyncStockModal({ isOpen, onClose, product }: { isOpen: b
           ]}
         />
 
-        <ModalInput label="Description" type="text" value={description} onChange={(e) => setDescription(e.target.value)} />
+        <ModalInput label="Description (optional)" type="text" value={description} onChange={(e) => setDescription(e.target.value)} />
       </div>
 
       <ModalFooter onCancel={onClose} onConfirm={handleSync} isLoading={isLoading} confirmText="Confirm Sync" />
