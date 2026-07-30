@@ -81,7 +81,7 @@ function QueryInventoryResults({ output }: { output: QueryInventoryToolOutput })
                 <span className="truncate text-[10px] text-slate-500">{r.name}</span>
               </div>
 
-              <div className="flex flex-shrink-0 items-center gap-2">
+              <div className="flex shrink-0 items-center gap-2">
                 {r.platform !== 'all' && <span className="rounded bg-indigo-500/10 px-1.5 py-0.5 text-[10px] font-semibold text-indigo-300">{r.platform}</span>}
 
                 {r.daysInCondition !== undefined && <span className="rounded bg-amber-500/10 px-1.5 py-0.5 text-[10px] font-semibold text-amber-300">{r.daysInCondition}d</span>}
