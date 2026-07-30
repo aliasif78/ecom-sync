@@ -37,6 +37,18 @@
 // acceptable at portfolio/demo scale, same documented tradeoff as
 // queryInventory.ts's per-candidate duration lookups. Would need a single
 // aggregation pipeline with $lookup if store counts ever got large.
+//
+// ⚠️ detectStockoutRisk's velocity calculation has two corrections from
+// smartStockout.ts's original filter: (1) scoped to reason: ORDER_FULFILLMENT
+// only, not every ledger entry with change < 0 — write-offs and manual
+// corrections aren't demand signals; (2) requires a minimum number of
+// distinct sale events before trusting the velocity figure at all — a
+// single order, however correctly tagged, is too small a sample to
+// extrapolate into a sustained daily rate. Confirmed via a real Inngest run
+// that (1) alone was insufficient: the false positive that surfaced was
+// already correctly tagged ORDER_FULFILLMENT, it was just a single event.
+// (2) is the correction that actually addressed it. See detectStockoutRisk's
+// own docstring for the full account.
 
 // ==========================================
 // 📦 Imports
@@ -50,6 +62,7 @@ import Store from '@/database/models/Store';
 import InventoryLedger from '@/database/models/InventoryLedger';
 import { ALERT_TYPE, ALERT_SEVERITY, AlertType, AlertSeverity } from '@/database/models/Alert';
 import { EPlatform } from '@/lib/globalConstants';
+import { InventoryReason } from '@/types';
 
 // ==========================================
 // 💿 THRESHOLDS
@@ -85,6 +98,17 @@ const SYNC_DRIFT_STALENESS_HOURS = 12;
 // --- Stockout risk ---
 const STOCKOUT_RISK_WINDOW_DAYS = 14; // matches the existing velocity window in smartStockout.ts
 const STOCKOUT_RISK_DAYS_THRESHOLD = 7; // matches the original prompt's "< 7 days" and published landing-page copy
+// A velocity computed from a single order is not a velocity — it's one sale
+// extrapolated into "N units/day forever." Confirmed via a real run: a
+// single 45-unit ORDER_FULFILLMENT entry (itself a legitimate STOCK_DROP
+// fixture, correctly tagged) produced a stockout-risk alert with no
+// relationship to sustained demand. Requiring multiple distinct sale events
+// before trusting the velocity figure is a real statistical fix, not a
+// workaround for one embarrassing case — it would also have prevented a
+// genuine one-off bulk order from a wholesale buyer being misread the same
+// way. 3 is a reasoned starting point (2 could still be coincidence), not a
+// measured threshold — revisit against real order-frequency data.
+const STOCKOUT_RISK_MIN_ORDER_COUNT = 3;
 
 const MS_PER_HOUR = 1000 * 60 * 60;
 const MS_PER_DAY = MS_PER_HOUR * 24;
@@ -342,6 +366,19 @@ export async function detectStoreStateContradictions(): Promise<AnomalyCandidate
  * but as a pure read — see the dead-field warning at the top of this file
  * for why this does NOT read or write Product.recentSalesVelocity.
  * Ongoing-condition type — dedupeKey is stable per product.
+ *
+ * ⚠️ TWO CORRECTIONS FROM smartStockout.ts's ORIGINAL FILTER:
+ *   1. Restricted to `reason: ORDER_FULFILLMENT` — the original matched ANY
+ *      `change < 0` entry, treating "not a restock" as equivalent to "a
+ *      sale." Write-offs and manual corrections aren't demand signals.
+ *   2. Requires at least STOCKOUT_RISK_MIN_ORDER_COUNT distinct sale events
+ *      in the window — this is the correction that actually mattered in
+ *      practice. Confirmed via a real Inngest run: fix #1 alone did NOT
+ *      catch a real false positive, because the offending ledger entry
+ *      (a legitimate STOCK_DROP test fixture) was itself already tagged
+ *      ORDER_FULFILLMENT. A single order, however correctly tagged, is too
+ *      small a sample to extrapolate into a sustained daily rate — fix #2
+ *      is the one that actually addresses that.
  */
 export async function detectStockoutRisk(): Promise<AnomalyCandidate[]> {
   await connectDB();
@@ -349,10 +386,17 @@ export async function detectStockoutRisk(): Promise<AnomalyCandidate[]> {
   const windowStart = new Date(Date.now() - STOCKOUT_RISK_WINDOW_DAYS * MS_PER_DAY);
 
   const candidates = await InventoryLedger.aggregate([
-    // Only sales (negative changes), not restocks — same filter as smartStockout.ts
-    { $match: { createdAt: { $gte: windowStart }, change: { $lt: 0 } } },
+    // Only genuine sales — see the correction note above for why this is
+    // NOT simply `change: { $lt: 0 }` (that also matches write-offs,
+    // manual corrections, and other non-demand-driven decreases).
+    { $match: { createdAt: { $gte: windowStart }, change: { $lt: 0 }, reason: InventoryReason.ORDER_FULFILLMENT } },
 
-    { $group: { _id: '$productId', userId: { $first: '$userId' }, totalSold: { $sum: { $abs: '$change' } } } },
+    { $group: { _id: '$productId', userId: { $first: '$userId' }, totalSold: { $sum: { $abs: '$change' } }, orderCount: { $sum: 1 } } },
+
+    // The actual fix for the single-order false positive: don't trust a
+    // velocity figure built from too few sale events to mean anything.
+    { $match: { orderCount: { $gte: STOCKOUT_RISK_MIN_ORDER_COUNT } } },
+
     { $addFields: { velocity: { $divide: ['$totalSold', STOCKOUT_RISK_WINDOW_DAYS] } } },
 
     { $lookup: { from: 'products', localField: '_id', foreignField: '_id', as: 'product' } },

@@ -82,6 +82,7 @@ async function main() {
   const stockoutRisk = await detectStockoutRisk();
   assertPresent('ANOM-RISK-HIGH (~0.48 days remaining)', stockoutRisk, (c) => c.dataPoints.sku === 'ANOM-RISK-HIGH', ALERT_SEVERITY.HIGH);
   assertAbsent('ANOM-RISK-NONE (50 days remaining)', stockoutRisk, (c) => c.dataPoints.sku === 'ANOM-RISK-NONE');
+  assertAbsent('ANOM-RISK-SINGLE-ORDER (same math as ANOM-RISK-HIGH, but only 1 order)', stockoutRisk, (c) => c.dataPoints.sku === 'ANOM-RISK-SINGLE-ORDER');
 
   // -----------------------------------------------------------------------
   console.log(`\n${allPassed ? '✅ ALL CHECKS PASSED' : '❌ SOME CHECKS FAILED — see above'}`);
