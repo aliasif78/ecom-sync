@@ -24,11 +24,6 @@
 // 📦 Imports
 // ==========================================
 
-import dotenv from 'dotenv';
-import path from 'path';
-
-dotenv.config({ path: path.resolve(process.cwd(), '.env.local') });
-
 import { Types } from 'mongoose';
 import { connectDB } from '@/database/mongoose';
 import Product from '@/database/models/Product';
@@ -90,7 +85,7 @@ async function main() {
     sku: 'TEST-A',
     name: 'Test Product A (5d out of stock, Amazon)',
     price: 19.99,
-    image: 'https://placehold.co/100',
+    image: 'https://loremflickr.com/320/240',
     stock: 0,
     inventoryByLocation: [{ locationId: DEF_LOC_ID, quantity: 0 }],
     mappings: { amazon: { storeId: fakeAmazonStoreId, asin: 'FAKEASIN0001', syncStatus: 'IDLE' } },
@@ -111,7 +106,7 @@ async function main() {
     sku: 'TEST-B',
     name: 'Test Product B (1d out of stock, Amazon)',
     price: 24.99,
-    image: 'https://placehold.co/100',
+    image: 'https://loremflickr.com/320/240',
     stock: 0,
     inventoryByLocation: [{ locationId: DEF_LOC_ID, quantity: 0 }],
     mappings: { amazon: { storeId: fakeAmazonStoreId, asin: 'FAKEASIN0002', syncStatus: 'IDLE' } },
@@ -136,7 +131,7 @@ async function main() {
     sku: 'TEST-C',
     name: 'Test Product C (relapsed 1d ago, previously out 5d ago)',
     price: 14.99,
-    image: 'https://placehold.co/100',
+    image: 'https://loremflickr.com/320/240',
     stock: 0,
     inventoryByLocation: [{ locationId: DEF_LOC_ID, quantity: 0 }],
     mappings: { amazon: { storeId: fakeAmazonStoreId, asin: 'FAKEASIN0003', syncStatus: 'IDLE' } },
@@ -161,7 +156,7 @@ async function main() {
     sku: 'TEST-D',
     name: 'Test Product D (Shopify only, low stock)',
     price: 9.99,
-    image: 'https://placehold.co/100',
+    image: 'https://loremflickr.com/320/240',
     stock: 3,
     inventoryByLocation: [{ locationId: DEF_LOC_ID, quantity: 3 }],
     mappings: { shopify: { storeId: fakeShopifyStoreId, variantId: 'gid://shopify/ProductVariant/999' } },
@@ -181,7 +176,7 @@ async function main() {
     sku: 'TEST-E',
     name: 'Test Product E (healthy stock)',
     price: 29.99,
-    image: 'https://placehold.co/100',
+    image: 'https://loremflickr.com/320/240',
     stock: 25,
     inventoryByLocation: [{ locationId: DEF_LOC_ID, quantity: 25 }],
     mappings: {},
