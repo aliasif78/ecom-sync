@@ -19,13 +19,15 @@
 // ==========================================
 
 import { streamText, convertToModelMessages, UIMessage, stepCountIs } from 'ai';
-import { google } from '@ai-sdk/google';
 
 // Auth
 import { getCurrentUser } from '@/lib/users';
 
 // Tool
 import { createQueryInventoryTool } from '@/lib/inventory/queryInventoryTool';
+
+// Reliability — model fallback middleware (see lib/ai/resilientModel.ts for design rationale)
+import { resilientQueryModel } from '@/lib/ai/resilientModel';
 
 export const maxDuration = 30;
 
@@ -75,9 +77,17 @@ export async function POST(req: Request) {
   const userId = authResult.user._id.toString();
 
   const result = streamText({
-    model: google('gemini-3.1-flash-lite'),
+    model: resilientQueryModel,
     system: SYSTEM_PROMPT,
     messages: await convertToModelMessages(messages),
+
+    // Reliability — Langfuse trace per call. functionId groups these calls
+    // together in the Langfuse dashboard distinctly from the mutation copilot.
+    experimental_telemetry: {
+      isEnabled: true,
+      functionId: 'inventory-query-agent',
+      metadata: { userId },
+    },
 
     // Exactly one tool, read-only. No mutation tool is reachable from this route.
     tools: {
