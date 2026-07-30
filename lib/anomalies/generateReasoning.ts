@@ -29,35 +29,42 @@
 // solved here because it's a call-site concern, not a reasoning-layer one.
 //
 // ⚠️ WHY A DETERMINISTIC FALLBACK, NOT JUST "TRUST THE ZOD SCHEMA":
-// generateObject's Zod schema only guarantees the OUTPUT SHAPE is correct
-// (an array of {dedupeKey, reasoning} strings) — it does NOT guarantee the
-// CONTENT is correctly attributed. Batching multiple anomalies into one call
-// (necessary for cost/latency) means the model could describe product A's
-// numbers under product B's dedupeKey, and a shape-only schema would never
-// catch that. So every reasoning is checked post-hoc: does the anomaly's own
-// identifying string (sku or storeName) actually appear in the text the
-// model wrote for that dedupeKey? If not — or if the model dropped or
-// invented a dedupeKey entirely — that item falls back to a deterministic,
+// The Zod schema passed to Output.object() only guarantees the OUTPUT SHAPE
+// is correct (an array of {dedupeKey, reasoning} strings) — it does NOT
+// guarantee the CONTENT is correctly attributed. Batching multiple anomalies
+// into one call (necessary for cost/latency) means the model could describe
+// product A's numbers under product B's dedupeKey, and a shape-only schema
+// would never catch that. So every reasoning is checked post-hoc: does the
+// anomaly's own identifying string (sku or storeName) actually appear in the
+// text the model wrote for that dedupeKey? If not — or if the model dropped
+// or invented a dedupeKey entirely — that item falls back to a deterministic,
 // template-built sentence assembled directly from dataPoints. This guarantees
 // every anomaly gets SOME correct, grounded reasoning, never a null, and
 // never a silently misattributed one.
+//
+// ⚠️ generateObject IS DEPRECATED IN THIS INSTALLED VERSION (ai@6.0.238) —
+// VERIFIED against the actual installed .d.ts, not assumed. The correct
+// replacement, per that same file's own @deprecated notice, is
+// `generateText({ output: Output.object({ schema }) })`, with the parsed
+// result on `result.output` — NOT `result.experimental_output`, which is
+// itself separately marked deprecated in favor of `.output`. This also
+// matches the Output.object() pattern already established in Week 2.
 
 // ==========================================
 // 📦 Imports
 // ==========================================
 
-import { generateObject } from 'ai';
+import { generateText, Output } from 'ai';
 import { z } from 'zod';
 
 import { resilientQueryModel } from '@/lib/ai/resilientModel';
 import { ALERT_TYPE, AlertType } from '@/database/models/Alert';
-import { AnomalyCandidate } from '@/lib/anomalies/detectors';
 
 // ==========================================
 // 💿 CONSTANTS
 // ==========================================
 
-// Anomalies per generateObject call. Kept modest (unlike smartStockout.ts's
+// Anomalies per structured-output call. Kept modest (unlike smartStockout.ts's
 // BATCH_SIZE=500) because this task is qualitatively different — that batch
 // asked for a simple array of IDs; this asks for distinct, correctly
 // attributed prose per item, which degrades with cross-item confusion long
@@ -85,11 +92,13 @@ export interface ReasoningResult {
   reasoning: string;
 }
 
-/** The reduced view of an anomaly actually sent to the model — deliberately
- * strips userId/productId/storeId/severity, which the model has no business
+/** The reduced view of an anomaly the model is ever given — deliberately
+ * strips userId/productId/storeId/severity, which it has no business
  * seeing or using (per "type + dataPoints only", nothing else crosses this
- * boundary). */
-interface ReasoningInput {
+ * boundary). This is also the exact shape Phase 4's reconcile step has
+ * available by the time it calls generateReasoning — full AnomalyCandidate
+ * objects don't survive that far, only this. */
+export interface ReasoningInput {
   dedupeKey: string;
   type: AlertType;
   dataPoints: Record<string, unknown>;
@@ -187,9 +196,9 @@ async function generateReasoningForBatch(batch: ReasoningInput[]): Promise<Reaso
   let modelOutputByKey = new Map<string, string>();
 
   try {
-    const { object } = await generateObject({
+    const { output } = await generateText({
       model: resilientQueryModel,
-      schema: reasoningOutputSchema,
+      output: Output.object({ schema: reasoningOutputSchema }),
       system: SYSTEM_PROMPT,
       prompt: JSON.stringify(batch.map(({ dedupeKey, type, dataPoints }) => ({ dedupeKey, type, dataPoints }))),
 
@@ -200,7 +209,7 @@ async function generateReasoningForBatch(batch: ReasoningInput[]): Promise<Reaso
       },
     });
 
-    modelOutputByKey = new Map(object.reasonings.map((r) => [r.dedupeKey, r.reasoning]));
+    modelOutputByKey = new Map(output.reasonings.map((r) => [r.dedupeKey, r.reasoning]));
   } catch (error) {
     // The whole batch's LLM call failed (both primary and fallback model,
     // per resilientQueryModel's own retry logic, were exhausted). This is
@@ -208,7 +217,7 @@ async function generateReasoningForBatch(batch: ReasoningInput[]): Promise<Reaso
     // its deterministic fallback below, same as an individual grounding
     // failure would. An anomaly missing its LLM-authored prose is a much
     // smaller problem than an anomaly missing an alert entirely.
-    console.warn(`⚠️ [ANOMALY_REASONING] generateObject failed for a batch of ${batch.length} — falling back to deterministic reasoning for all of them.`, error);
+    console.warn(`⚠️ [ANOMALY_REASONING] generateText (structured output) failed for a batch of ${batch.length} — falling back to deterministic reasoning for all of them.`, error);
   }
 
   // Reconcile: every input item gets exactly one output, whether that's the
@@ -236,19 +245,18 @@ async function generateReasoningForBatch(batch: ReasoningInput[]): Promise<Reaso
 // ==========================================
 
 /**
- * Generates reasoning for a list of already-detected anomalies. Accepts the
- * full AnomalyCandidate shape (as produced by the detectors) for caller
- * convenience, but strips everything except {dedupeKey, type, dataPoints}
- * before it ever reaches the model — see ReasoningInput above.
+ * Generates reasoning for a list of already-detected anomalies, given only
+ * what the model is allowed to see: {dedupeKey, type, dataPoints}. Callers
+ * holding full AnomalyCandidate objects (e.g. a standalone test script) can
+ * still pass them directly — AnomalyCandidate structurally satisfies
+ * ReasoningInput, so no explicit stripping is required at the call site.
  *
  * Batches internally (REASONING_BATCH_SIZE) and runs batches in parallel.
- * Every input candidate is guaranteed exactly one result, in no particular
- * order — callers should key off `dedupeKey`, not array position.
+ * Every input is guaranteed exactly one result, in no particular order —
+ * callers should key off `dedupeKey`, not array position.
  */
-export async function generateReasoning(candidates: AnomalyCandidate[]): Promise<ReasoningResult[]> {
-  if (candidates.length === 0) return [];
-
-  const inputs: ReasoningInput[] = candidates.map(({ dedupeKey, type, dataPoints }) => ({ dedupeKey, type, dataPoints }));
+export async function generateReasoning(inputs: ReasoningInput[]): Promise<ReasoningResult[]> {
+  if (inputs.length === 0) return [];
 
   const batches: ReasoningInput[][] = [];
   for (let i = 0; i < inputs.length; i += REASONING_BATCH_SIZE) {
