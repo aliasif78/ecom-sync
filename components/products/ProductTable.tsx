@@ -1,7 +1,7 @@
 'use client';
 
 // React
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 
 // Components
 import { Table } from '@/components/shared/Table';
@@ -34,6 +34,13 @@ import { FORCE_SYNC_ALL_PRODUCTS_CLICKED } from '@/lib/posthog/constants';
 interface Props {
   products: ProductRow[];
   isSyncing: string[];
+  /**
+   * productIds (as strings) with an OPEN STOCKOUT_RISK alert, from
+   * lib/alerts/index.ts's getOpenStockoutRiskProductIds. Replaces the old
+   * product.stockoutRisk boolean — see Product.ts for why that field was
+   * removed. Membership in this list drives the "Stockout Risk" badge below.
+   */
+  stockoutRiskProductIds: string[];
 }
 
 // Helpers
@@ -52,13 +59,17 @@ const Spinner = ({ spin }: { spin?: boolean }) => (
   </div>
 );
 
-const ProductTable = ({ products, isSyncing }: Props) => {
+const ProductTable = ({ products, isSyncing, stockoutRiskProductIds }: Props) => {
   // States
   const [disableForceSyncAll, setDisableForceSyncAll] = useState(false);
   const [disabledDeleteId, setDisabledDeleteId] = useState<string[]>([]);
 
   // Hooks
   const { openSyncModal, openEditModal, openHistoryModal } = useProductModals();
+
+  // O(1) membership check per row instead of an .includes() scan — cheap
+  // either way at this scale, but no reason not to do it properly.
+  const stockoutRiskSet = useMemo(() => new Set(stockoutRiskProductIds), [stockoutRiskProductIds]);
 
   // Functions
   const handleDelete = async (id: string) => {
@@ -100,6 +111,7 @@ const ProductTable = ({ products, isSyncing }: Props) => {
       {products.map((product) => {
         const stockStatus = getStockStatus(product.stock);
         const disableSync = isSyncing.includes(product.sku);
+        const hasStockoutRisk = stockoutRiskSet.has(product._id);
 
         return (
           <tr key={product._id} className="group transition-all duration-300 hover:bg-white/5">
@@ -113,8 +125,9 @@ const ProductTable = ({ products, isSyncing }: Props) => {
                   <div className="text-base font-semibold text-slate-100">{product.name}</div>
                   <div className="font-mono text-xs text-slate-500">{product.sku}</div>
 
-                  {/* 🧠 THE SMART STOCKOUT BADGE */}
-                  {product.stockoutRisk && (
+                  {/* 🧠 STOCKOUT RISK BADGE — now backed by an OPEN STOCKOUT_RISK Alert
+                      (lib/alerts/index.ts), not the removed product.stockoutRisk field. */}
+                  {hasStockoutRisk && (
                     <span className="inline-flex animate-pulse items-center gap-1 rounded-full border border-red-500/30 bg-red-500/10 px-2 py-0.5 text-[10px] font-bold tracking-wider text-red-400 uppercase shadow-[0_0_10px_rgba(249,115,22,0.2)]">
                       <PiSparkleFill className="h-3 w-3" /> Stockout Risk
                     </span>

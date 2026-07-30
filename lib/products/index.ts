@@ -67,7 +67,7 @@ export async function getProducts(userId: string) {
         updatedAt: product.updatedAt?.toISOString(),
 
         // ── Analytics timestamps ─────────────────────────────────────────
-        lastRiskAnalysis: product.lastRiskAnalysis ? new Date(product.lastRiskAnalysis).toISOString() : null,
+        // lastRiskAnalysis REMOVED (Feature 2 cleanup) — field no longer exists on Product.
         archivedAt: toISOOrUndefined(product.archivedAt),
 
         // ── Inventory sub-documents ──────────────────────────────────────
