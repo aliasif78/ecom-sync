@@ -15,12 +15,17 @@
 // `dedupeKey` identifies "the same underlying anomaly" across cron runs so a
 // 6-hourly job doesn't spam a new alert every run for one ongoing problem.
 //
-//   - Discrete-event types (STOCK_DROP, NEGATIVE_STOCK): dedupeKey is tied to
-//     a specific point in time (e.g. the triggering InventoryLedger _id), so
-//     dismissing/resolving one never suppresses a genuinely NEW drop later.
-//   - Ongoing-condition types (SYNC_DRIFT, STORE_STATE_CONTRADICTION,
-//     STOCKOUT_RISK): dedupeKey is stable per entity (storeId or productId),
-//     because the "event" is a persistent state, not a moment.
+//   - Discrete-event types (STOCK_DROP only): dedupeKey is tied to a specific
+//     point in time (the triggering InventoryLedger _id), so dismissing or
+//     resolving one never suppresses a genuinely NEW drop later.
+//   - Ongoing-condition types (NEGATIVE_STOCK, SYNC_DRIFT,
+//     STORE_STATE_CONTRADICTION, STOCKOUT_RISK): dedupeKey is stable per
+//     entity (productId or storeId), because the "event" is a persistent
+//     state, not a moment. NEGATIVE_STOCK belongs here, not with STOCK_DROP —
+//     a product sitting at -3 units is an ongoing condition, not a one-time
+//     occurrence, and keying it to a ledger entry would require the same
+//     "find the crossing point" complexity as queryInventory.ts's duration
+//     logic for what's supposed to be the cheapest detector in the set.
 //
 // The uniqueness constraint below is a PARTIAL index scoped to `status: OPEN`.
 // This is deliberate: a DISMISSED or RESOLVED alert must never block a new
