@@ -83,7 +83,7 @@ export const smartStockoutCheck = inngest.createFunction(
     const highRiskIds = await step.run('analyze-with-gemini', async () => {
       // A) Set up the model
       const model = GEN_AI.getGenerativeModel({
-        model: 'gemini-2.5-flash-lite',
+        model: 'gemini-3.1-flash-lite',
 
         generationConfig: {
           responseMimeType: 'application/json',
