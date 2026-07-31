@@ -6,6 +6,7 @@ import { useState, useMemo } from 'react';
 // Components
 import { Table } from '@/components/shared/Table';
 import { ActionButton, Icons } from '@/components/shared/TableActions';
+import ProductPagination from '@/components/products/ProductPagination';
 
 // Contexts & Actions
 import { useProductModals } from '@/contexts/ProductModalsProvider';
@@ -13,6 +14,7 @@ import { deleteProduct } from '@/actions/products';
 
 // Types
 import { ProductRow } from '@/types';
+import { ProductsPaginationInfo } from '@/lib/products';
 
 // Icons
 import { PiSparkleFill } from 'react-icons/pi';
@@ -29,6 +31,7 @@ import posthog from 'posthog-js';
 
 // Constants
 import { FORCE_SYNC_ALL_PRODUCTS_CLICKED } from '@/lib/posthog/constants';
+import { LOW_STOCK_THRESHOLD } from '@/lib/globalConstants';
 
 // Interfaces
 interface Props {
@@ -41,6 +44,13 @@ interface Props {
    * removed. Membership in this list drives the "Stockout Risk" badge below.
    */
   stockoutRiskProductIds: string[];
+  /**
+   * BE-computed pagination metadata for the whole catalog — see
+   * lib/products/index.ts's getProducts. `products` above is only the
+   * current page's slice; `pagination.totalCount` is the true total across
+   * every page, used for the header's record count and the pager itself.
+   */
+  pagination: ProductsPaginationInfo;
 }
 
 // Helpers
@@ -48,7 +58,7 @@ const formatCurrency = (amount: number) => new Intl.NumberFormat('en-US', { styl
 
 const getStockStatus = (stock: number) => {
   if (stock === 0) return { label: 'Out of Stock', color: 'bg-red-500/20 text-red-300 ring-1 ring-red-500/30' };
-  if (stock < 10) return { label: 'Low Stock', color: 'bg-amber-500/20 text-amber-300 ring-1 ring-amber-500/30' };
+  if (stock < LOW_STOCK_THRESHOLD) return { label: 'Low Stock', color: 'bg-amber-500/20 text-amber-300 ring-1 ring-amber-500/30' };
   return { label: 'In Stock', color: 'bg-emerald-500/20 text-emerald-300 ring-1 ring-emerald-500/30' };
 };
 
@@ -59,7 +69,7 @@ const Spinner = ({ spin }: { spin?: boolean }) => (
   </div>
 );
 
-const ProductTable = ({ products, isSyncing, stockoutRiskProductIds }: Props) => {
+const ProductTable = ({ products, isSyncing, stockoutRiskProductIds, pagination }: Props) => {
   // States
   const [disableForceSyncAll, setDisableForceSyncAll] = useState(false);
   const [disabledDeleteId, setDisabledDeleteId] = useState<string[]>([]);
@@ -107,69 +117,77 @@ const ProductTable = ({ products, isSyncing, stockoutRiskProductIds }: Props) =>
   const IS_SYNCING_ANY = disableForceSyncAll || isSyncing.length > 0;
 
   return (
-    <Table title="Global Inventory" description="Real-time stock levels across all channels" recordCount={products.length} headers={['Product', 'Price', 'Status', 'Inventory', 'Actions']} headerBtn={{ label: IS_SYNCING_ANY ? 'Syncing...' : 'Force Sync All', icon: IS_SYNCING_ANY ? <Spinner spin /> : <PiSparkleFill />, onClick: () => handleForceSyncAll(), disabled: IS_SYNCING_ANY }}>
-      {products.map((product) => {
-        const stockStatus = getStockStatus(product.stock);
-        const disableSync = isSyncing.includes(product.sku);
-        const hasStockoutRisk = stockoutRiskSet.has(product._id);
+    <div className="space-y-4">
+      {/* recordCount is the BE-computed total across ALL pages
+          (pagination.totalCount), not products.length — products.length
+          would only ever show the current page's size (e.g. "10 Records"
+          forever, regardless of catalog size). */}
+      <Table title="Global Inventory" description="Real-time stock levels across all channels" recordCount={pagination.totalCount} headers={['Product', 'Price', 'Status', 'Inventory', 'Actions']} headerBtn={{ label: IS_SYNCING_ANY ? 'Syncing...' : 'Force Sync All', icon: IS_SYNCING_ANY ? <Spinner spin /> : <PiSparkleFill />, onClick: () => handleForceSyncAll(), disabled: IS_SYNCING_ANY }}>
+        {products.map((product) => {
+          const stockStatus = getStockStatus(product.stock);
+          const disableSync = isSyncing.includes(product.sku);
+          const hasStockoutRisk = stockoutRiskSet.has(product._id);
 
-        return (
-          <tr key={product._id} className="group transition-all duration-300 hover:bg-white/5">
-            {/* Product */}
-            <td className="px-8 py-5 whitespace-nowrap">
-              <div className="flex items-center gap-4">
-                <div className="relative h-14 w-14 shrink-0 overflow-hidden rounded-xl border border-white/10 bg-slate-800">
-                  <Image src={product.image} alt={product.name} fill sizes="(max-width: 768px) 100vw, 300px" className="rounded-lg object-cover" />
+          return (
+            <tr key={product._id} className="group transition-all duration-300 hover:bg-white/5">
+              {/* Product */}
+              <td className="px-8 py-5 whitespace-nowrap">
+                <div className="flex items-center gap-4">
+                  <div className="relative h-14 w-14 shrink-0 overflow-hidden rounded-xl border border-white/10 bg-slate-800">
+                    <Image src={product.image} alt={product.name} fill sizes="(max-width: 768px) 100vw, 300px" className="rounded-lg object-cover" />
+                  </div>
+                  <div className="space-y-2">
+                    <div className="text-base font-semibold text-slate-100">{product.name}</div>
+                    <div className="font-mono text-xs text-slate-500">{product.sku}</div>
+
+                    {/* 🧠 STOCKOUT RISK BADGE — now backed by an OPEN STOCKOUT_RISK Alert
+                        (lib/alerts/index.ts), not the removed product.stockoutRisk field. */}
+                    {hasStockoutRisk && (
+                      <span className="inline-flex animate-pulse items-center gap-1 rounded-full border border-red-500/30 bg-red-500/10 px-2 py-0.5 text-[10px] font-bold tracking-wider text-red-400 uppercase shadow-[0_0_10px_rgba(249,115,22,0.2)]">
+                        <PiSparkleFill className="h-3 w-3" /> Stockout Risk
+                      </span>
+                    )}
+                  </div>
                 </div>
-                <div className="space-y-2">
-                  <div className="text-base font-semibold text-slate-100">{product.name}</div>
-                  <div className="font-mono text-xs text-slate-500">{product.sku}</div>
+              </td>
 
-                  {/* 🧠 STOCKOUT RISK BADGE — now backed by an OPEN STOCKOUT_RISK Alert
-                      (lib/alerts/index.ts), not the removed product.stockoutRisk field. */}
-                  {hasStockoutRisk && (
-                    <span className="inline-flex animate-pulse items-center gap-1 rounded-full border border-red-500/30 bg-red-500/10 px-2 py-0.5 text-[10px] font-bold tracking-wider text-red-400 uppercase shadow-[0_0_10px_rgba(249,115,22,0.2)]">
-                      <PiSparkleFill className="h-3 w-3" /> Stockout Risk
-                    </span>
-                  )}
+              {/* Price */}
+              <td className="px-8 py-5 whitespace-nowrap">
+                <div className="text-base font-bold text-emerald-400">{formatCurrency(product.price)}</div>
+              </td>
+
+              {/* Status */}
+              <td className="px-8 py-5 whitespace-nowrap">
+                <span className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-bold shadow-lg ring-1 ${stockStatus.color}`}>{stockStatus.label}</span>
+              </td>
+
+              {/* Inventory */}
+              <td className="px-8 py-5 text-sm whitespace-nowrap">
+                <span className="font-mono text-lg font-bold text-slate-200">{product.stock}</span>
+                <span className="ml-1 text-slate-500">units</span>
+              </td>
+
+              {/* Actions */}
+              <td className="px-8 py-5 text-right text-sm font-medium whitespace-nowrap">
+                <div className="flex items-center justify-end gap-3">
+                  <ActionButton icon={<Icons.History />} onClick={() => openHistoryModal(product)} title="View History" />
+                  <ActionButton icon={<Icons.Edit />} onClick={() => openEditModal(product)} title="Edit Product" disabled={disableSync} />
+                  <ActionButton icon={<Icons.Delete />} onClick={() => handleDelete(product._id)} variant="danger" title="Delete Product" disabled={disableSync || disabledDeleteId.includes(product._id)} />
+
+                  {/* Primary Sync Button */}
+                  <button disabled={disableSync} onClick={() => syncModalHandler(product)} className="ml-2 flex items-center gap-2 rounded-lg bg-indigo-600 px-4 py-2.5 font-semibold text-white shadow-lg shadow-indigo-500/20 transition-all hover:-translate-y-0.5 hover:bg-indigo-500 hover:shadow-indigo-500/40 disabled:cursor-not-allowed disabled:opacity-50">
+                    <Spinner spin={disableSync} />
+                    <span>{disableSync ? 'Syncing...' : 'Sync'}</span>
+                  </button>
                 </div>
-              </div>
-            </td>
+              </td>
+            </tr>
+          );
+        })}
+      </Table>
 
-            {/* Price */}
-            <td className="px-8 py-5 whitespace-nowrap">
-              <div className="text-base font-bold text-emerald-400">{formatCurrency(product.price)}</div>
-            </td>
-
-            {/* Status */}
-            <td className="px-8 py-5 whitespace-nowrap">
-              <span className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-bold shadow-lg ring-1 ${stockStatus.color}`}>{stockStatus.label}</span>
-            </td>
-
-            {/* Inventory */}
-            <td className="px-8 py-5 text-sm whitespace-nowrap">
-              <span className="font-mono text-lg font-bold text-slate-200">{product.stock}</span>
-              <span className="ml-1 text-slate-500">units</span>
-            </td>
-
-            {/* Actions */}
-            <td className="px-8 py-5 text-right text-sm font-medium whitespace-nowrap">
-              <div className="flex items-center justify-end gap-3">
-                <ActionButton icon={<Icons.History />} onClick={() => openHistoryModal(product)} title="View History" />
-                <ActionButton icon={<Icons.Edit />} onClick={() => openEditModal(product)} title="Edit Product" disabled={disableSync} />
-                <ActionButton icon={<Icons.Delete />} onClick={() => handleDelete(product._id)} variant="danger" title="Delete Product" disabled={disableSync || disabledDeleteId.includes(product._id)} />
-
-                {/* Primary Sync Button */}
-                <button disabled={disableSync} onClick={() => syncModalHandler(product)} className="ml-2 flex items-center gap-2 rounded-lg bg-indigo-600 px-4 py-2.5 font-semibold text-white shadow-lg shadow-indigo-500/20 transition-all hover:-translate-y-0.5 hover:bg-indigo-500 hover:shadow-indigo-500/40 disabled:cursor-not-allowed disabled:opacity-50">
-                  <Spinner spin={disableSync} />
-                  <span>{disableSync ? 'Syncing...' : 'Sync'}</span>
-                </button>
-              </div>
-            </td>
-          </tr>
-        );
-      })}
-    </Table>
+      <ProductPagination pagination={pagination} />
+    </div>
   );
 };
 

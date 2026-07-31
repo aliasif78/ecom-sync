@@ -4,7 +4,7 @@ import { connectDB } from '@/database/mongoose';
 import { Types } from 'mongoose';
 
 // Constants
-import { DEF_LOC_ID } from '../globalConstants';
+import { DEF_LOC_ID, DEFAULT_PRODUCTS_PAGE_SIZE, MAX_PRODUCTS_PAGE_SIZE, LOW_STOCK_THRESHOLD } from '../globalConstants';
 import { PRODUCT_CREATED, PRODUCT_CREATION_FAILED, PRODUCT_ARCHIVED, PRODUCT_ARCHIVE_FAILED, PRODUCT_UPDATED, PRODUCT_UPDATE_FAILED } from '@/lib/posthog/constants';
 
 // Utils & Helpers
@@ -32,27 +32,101 @@ const toStringOrUndefined = (value: Types.ObjectId | string | undefined): string
 const toISOOrUndefined = (value: Date | string | undefined): string | undefined => (value !== undefined ? new Date(value).toISOString() : undefined);
 
 // ---------------------------------------------------------------------------
+// Public types
+// ---------------------------------------------------------------------------
+
+/**
+ * Pagination metadata returned alongside a page of products. Exported from
+ * here (not types/index.ts) — this module owns the shape of what it
+ * returns, same precedent as QueryInventoryResult living next to
+ * queryInventory.ts instead of the shared types file.
+ */
+export interface ProductsPaginationInfo {
+  page: number;
+  limit: number;
+  totalCount: number;
+  totalPages: number;
+}
+
+/** Whole-catalog stats — deliberately NOT scoped to the current page. */
+export interface ProductsCatalogStats {
+  totalStock: number;
+  lowStockCount: number;
+}
+
+// ---------------------------------------------------------------------------
 // Public exports
 // ---------------------------------------------------------------------------
 
 /**
- * Fetches all non-archived products belonging to `userId`, serializes every
- * ObjectId and Date field to string/ISO-string, and returns a shape that
- * matches `ProductRow` exactly.
+ * Fetches ONE PAGE of non-archived products belonging to `userId`, serializes
+ * every ObjectId and Date field to string/ISO-string, and returns a shape
+ * that matches `ProductRow` exactly — plus pagination metadata and
+ * whole-catalog stats (total stock, low-stock count) computed independently
+ * of which page was requested.
  *
  * Why manual serialization?
  *   Next.js forbids passing non-serializable values (ObjectId, Date) from
  *   Server Components to Client Components as props.  `.lean()` returns POJOs
  *   but preserves `Types.ObjectId` instances on nested sub-documents, so we
  *   must walk the entire mapping tree explicitly.
+ *
+ * Why three DB round-trips instead of one?
+ *   `find` (this page's documents), `countDocuments` (total for the pager),
+ *   and `aggregate` (whole-catalog stock/low-stock totals) answer different
+ *   questions and can't be collapsed into a single query. They run in
+ *   parallel via Promise.all, so it's one network round-trip's worth of
+ *   latency, not three sequential ones.
+ *
+ * ⚠️ `isArchived` exclusion gotcha:
+ *   `ProductSchema.pre(/^find/, ...)` auto-excludes archived products from
+ *   `find`/`findOne`-family calls, but that regex does NOT match
+ *   `countDocuments` or `aggregate` — Mongoose query middleware for those
+ *   method names isn't covered by `/^find/`. `.find()` below still gets the
+ *   auto-exclusion for free; `countDocuments` and the `$match` stage below
+ *   both filter `isArchived` explicitly so the pager total and the stats
+ *   don't silently include soft-deleted products.
  */
-export async function getProducts(userId: string) {
+export async function getProducts(userId: string, options?: { page?: number; limit?: number }) {
+  // Pagination params — clamped server-side. The frontend can pass a `page`
+  // and (in principle) a `limit`, but `limit` is never actually exposed to
+  // the URL — see ProductPagination.tsx / app/products/page.tsx — and even
+  // if it were, it's capped here regardless of what's asked for.
+  const limit = Math.min(Math.max(options?.limit ?? DEFAULT_PRODUCTS_PAGE_SIZE, 1), MAX_PRODUCTS_PAGE_SIZE);
+  const page = Math.max(options?.page ?? 1, 1);
+  const skip = (page - 1) * limit;
+
+  const defaultPagination: ProductsPaginationInfo = { page: 1, limit: DEFAULT_PRODUCTS_PAGE_SIZE, totalCount: 0, totalPages: 1 };
+  const defaultStats: ProductsCatalogStats = { totalStock: 0, lowStockCount: 0 };
+
   try {
     await connectDB();
 
-    const products = await Product.find({ userId: new Types.ObjectId(userId) })
-      .sort({ createdAt: -1 })
-      .lean();
+    const userObjectId = new Types.ObjectId(userId);
+
+    const [products, totalCount, statsAgg] = await Promise.all([
+      Product.find({ userId: userObjectId }).sort({ createdAt: -1 }).skip(skip).limit(limit).lean(),
+
+      // Explicit isArchived filter — countDocuments is NOT covered by the
+      // schema's pre(/^find/) hook. See the ⚠️ note above.
+      Product.countDocuments({ userId: userObjectId, isArchived: { $ne: true } }),
+
+      // Explicit isArchived filter — same reason, aggregate() bypasses the
+      // hook entirely.
+      Product.aggregate([
+        { $match: { userId: userObjectId, isArchived: { $ne: true } } },
+        {
+          $group: {
+            _id: null,
+            totalStock: { $sum: '$stock' },
+            lowStockCount: { $sum: { $cond: [{ $lt: ['$stock', LOW_STOCK_THRESHOLD] }, 1, 0] } },
+          },
+        },
+      ]),
+    ]);
+
+    const totalPages = Math.max(Math.ceil(totalCount / limit), 1);
+    const { totalStock = 0, lowStockCount = 0 } = statsAgg[0] ?? {};
 
     return {
       success: true,
@@ -100,6 +174,8 @@ export async function getProducts(userId: string) {
           },
         },
       })),
+      pagination: { page, limit, totalCount, totalPages } as ProductsPaginationInfo,
+      stats: { totalStock, lowStockCount } as ProductsCatalogStats,
     };
   } catch (error) {
     console.error('🚩 GET_PRODUCTS_ERROR:', error);
@@ -107,6 +183,8 @@ export async function getProducts(userId: string) {
       success: false,
       message: 'An unexpected error occured while fetching your products.',
       products: [],
+      pagination: defaultPagination,
+      stats: defaultStats,
     };
   }
 }
