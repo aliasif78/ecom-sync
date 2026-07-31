@@ -7,7 +7,7 @@ import Store from '@/database/models/Store';
 import { connectDB } from '@/database/mongoose';
 
 // Constants
-import { EPlatform } from '@/lib/globalConstants';
+import { EPlatform, DEFAULT_STORES_PAGE_SIZE, MAX_STORES_PAGE_SIZE } from '@/lib/globalConstants';
 import { STORE_ADDED, STORE_ADD_FAILED, STORE_DELETED, STORE_DELETE_FAILED } from '../posthog/constants';
 
 // Utils & Helpers
@@ -31,6 +31,18 @@ export interface AddStoreParams {
 
 /** Shape of per-field credential errors returned to the client. */
 export type StoreFieldErrors = Partial<Record<'name' | 'storeUrl' | 'accessToken' | 'apiKey' | 'consumerKey' | 'consumerSecret', string>>;
+
+/**
+ * Pagination metadata for the /stores list. Exported from here (not
+ * types/index.ts) for the same reason as ProductsPaginationInfo in
+ * lib/products/index.ts — this module owns the shape of what it returns.
+ */
+export interface StoresPaginationInfo {
+  page: number;
+  limit: number;
+  totalCount: number;
+  totalPages: number;
+}
 
 // ---------------------------------------------------------------------------
 // Zod Schemas — Platform-specific credential validation
@@ -158,23 +170,49 @@ export async function addStore(params: AddStoreParams) {
 // getStoresByUserId
 // ---------------------------------------------------------------------------
 
-export async function getStoresByUserId({ userId }: { userId: string }) {
+/**
+ * Fetches ONE PAGE of stores belonging to `userId` (config excluded),
+ * plus pagination metadata for the pager.
+ *
+ * BE-enforced pagination, same discipline as lib/products/index.ts's
+ * getProducts: `limit` is clamped to MAX_STORES_PAGE_SIZE and `page` is
+ * clamped to >= 1 here, independent of whatever the caller asked for.
+ *
+ * No `isArchived`-style bypass concern here — Store has no soft-delete
+ * field or query middleware (see database/models/Store.ts); deleteStoreById
+ * hard-deletes. `countDocuments` below needs no extra filter beyond `userId`.
+ */
+export async function getStoresByUserId({ userId, page, limit }: { userId: string; page?: number; limit?: number }) {
+  const defaultPagination: StoresPaginationInfo = { page: 1, limit: DEFAULT_STORES_PAGE_SIZE, totalCount: 0, totalPages: 1 };
+
   try {
     // 1. Connect to DB
     await connectDB();
 
-    // 2. Fetch stores (exclude sensitive config)
-    const stores = await Store.find({ userId: new Types.ObjectId(userId) })
-      .select('-config')
-      .sort({ createdAt: -1 })
-      .lean();
+    // 2. Pagination params — clamped server-side.
+    const limitClamped = Math.min(Math.max(limit ?? DEFAULT_STORES_PAGE_SIZE, 1), MAX_STORES_PAGE_SIZE);
+    const pageClamped = Math.max(page ?? 1, 1);
+    const skip = (pageClamped - 1) * limitClamped;
 
-    // 3. Serialize Mongoose ObjectIds to plain strings
+    const userObjectId = new Types.ObjectId(userId);
+
+    // 3. Fetch this page's stores (exclude sensitive config) + total count,
+    // in parallel — one network round-trip, two independent queries.
+    const [stores, totalCount] = await Promise.all([Store.find({ userId: userObjectId }).select('-config').sort({ createdAt: -1 }).skip(skip).limit(limitClamped).lean(), Store.countDocuments({ userId: userObjectId })]);
+
+    // 4. Serialize Mongoose ObjectIds to plain strings
     const sanitizedStores = JSON.parse(JSON.stringify(stores));
-    return { success: true, message: 'Stores fetched successfully!', stores: sanitizedStores };
+    const totalPages = Math.max(Math.ceil(totalCount / limitClamped), 1);
+
+    return {
+      success: true,
+      message: 'Stores fetched successfully!',
+      stores: sanitizedStores,
+      pagination: { page: pageClamped, limit: limitClamped, totalCount, totalPages } as StoresPaginationInfo,
+    };
   } catch (error) {
     console.error('🚩 GET_STORES_ERROR:', error);
-    return { success: false, message: 'Failed to fetch stores.' };
+    return { success: false, message: 'Failed to fetch stores.', pagination: defaultPagination };
   }
 }
 
@@ -187,6 +225,8 @@ export async function getStoresByUserId({ userId }: { userId: string }) {
  * aggregation pipeline — no N+1, no multiple round-trips.
  *
  * Returns counts per platform plus the number of connected/synced stores.
+ * Deliberately independent of pagination — this reflects the WHOLE
+ * collection, not whichever page of stores is currently being displayed.
  *
  * @param userId - The authenticated user's MongoDB ObjectId string.
  */

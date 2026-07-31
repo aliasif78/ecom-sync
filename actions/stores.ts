@@ -59,15 +59,19 @@ export async function addStoreAction(data: { name: string; platform: EPlatform; 
 // ---------------------------------------------------------------------------
 
 /**
- * Returns all stores belonging to the authenticated user.
+ * Returns ONE PAGE of stores belonging to the authenticated user.
+ *
+ * `page` is a navigation hint passed from the /stores page's `?page=`
+ * search param — re-clamped again inside getStoresByUserId, same
+ * defense-in-depth pattern as the products page.
  *
  * Also surfaces `userId` in the response so the Stores page can subscribe
  * to the correct Pusher channel for real-time `store-verified` events
  * without requiring a separate round-trip to resolve the session user.
  */
-export async function getStoresByUserIdAction() {
+export async function getStoresByUserIdAction(page?: number) {
   return authGuard('GET_STORES_BY_USER_ID', null, async (userId) => {
-    const result = await getStoresByUserId({ userId });
+    const result = await getStoresByUserId({ userId, page });
     return { ...result, userId };
   });
 }

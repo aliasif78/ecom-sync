@@ -7,9 +7,11 @@ import { useState, useCallback } from 'react';
 import { Table } from '@/components/shared/Table';
 import { ActionButton, Icons } from '@/components/shared/TableActions';
 import StorePusher from '@/components/stores/StorePusher';
+import StorePagination from '@/components/stores/StorePagination';
 
 // Types
 import { StoreRow } from '@/types/index';
+import { StoresPaginationInfo } from '@/lib/stores';
 
 // Contexts
 import { useStoreModals } from '@/contexts/StoreModalsProvider';
@@ -28,6 +30,12 @@ interface Props {
   stores: StoreRow[];
   /** The authenticated user's MongoDB ObjectId — used as the Pusher channel key. */
   userId: string;
+  /**
+   * BE-computed pagination metadata for the whole store collection — see
+   * lib/stores/index.ts's getStoresByUserId. `stores` above is only the
+   * current page's slice; `pagination.totalCount` is the true total.
+   */
+  pagination: StoresPaginationInfo;
 }
 
 // ---------------------------------------------------------------------------
@@ -103,6 +111,13 @@ const VerifyingBadge = () => (
  *   called) of storeIds that were already `isConnected: false` on mount.
  *   These are legitimately failed/old stores → "Disconnected" badge.
  *
+ *   ⚠️ Because this snapshot is only computed on first mount, this
+ *   component MUST be remounted whenever `stores` changes to a genuinely
+ *   different set (e.g. a pagination page change) — otherwise stores from
+ *   a newly-loaded page that aren't in the stale snapshot would incorrectly
+ *   render "Verifying…" instead of "Disconnected". The parent
+ *   (app/stores/page.tsx) forces this via `key={page}` on StoreListWrapper.
+ *
  * - `isVerifying` is fully derived at render time — no extra state or effects:
  *     isConnected is false
  *     AND the store was not disconnected when the component mounted   ← new store
@@ -110,7 +125,7 @@ const VerifyingBadge = () => (
  *   Once the Pusher event arrives, the storeId enters `connectionOverrides`
  *   and `isVerifying` immediately becomes false on the next render.
  */
-const StoreTable = ({ stores, userId }: Props) => {
+const StoreTable = ({ stores, userId, pagination }: Props) => {
   // ── State ──────────────────────────────────────────────────────────────────
 
   /**
@@ -175,11 +190,13 @@ const StoreTable = ({ stores, userId }: Props) => {
   // ── Render ────────────────────────────────────────────────────────────────
 
   return (
-    <>
+    <div className="space-y-4">
       {/* Invisible Pusher subscriber — no DOM output, purely side-effectful */}
       <StorePusher userId={userId} onStoreVerified={handleStoreVerified} />
 
-      <Table title="Active Channels" description="Manage your connected e-commerce integrations" recordCount={stores.length} headers={['Store Identity', 'Platform', 'Connection', 'Sync Status', 'Last Activity', 'Actions']}>
+      {/* recordCount is the BE-computed total across ALL pages
+          (pagination.totalCount), not stores.length. */}
+      <Table title="Active Channels" description="Manage your connected e-commerce integrations" recordCount={pagination.totalCount} headers={['Store Identity', 'Platform', 'Connection', 'Sync Status', 'Last Activity', 'Actions']}>
         {stores.map((store) => {
           const platformStyle = getPlatformStyle(store.platform);
 
@@ -241,7 +258,9 @@ const StoreTable = ({ stores, userId }: Props) => {
           );
         })}
       </Table>
-    </>
+
+      <StorePagination pagination={pagination} />
+    </div>
   );
 };
 
