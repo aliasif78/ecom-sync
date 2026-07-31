@@ -101,3 +101,73 @@ Documented here rather than left for a client to discover:
 - **Read/write separation is UI-level as well as route-level**: the mutation-capable tool set is unreachable from `/api/chat/query` at the code level (the strongest guarantee), but the frontend also keeps Ask and Act as separate `useChat` instances so a user can't accidentally issue a mutation-intent phrase while in Ask mode and have it silently routed to the wrong tool set.
 - **Langfuse sessions are not implemented** — traces are captured per call, but there's no session-level grouping across a multi-turn conversation. Would require explicit session ID propagation, not currently wired in.
 ```
+
+# Feature 2: Inventory Anomaly Agent
+
+## Overview
+
+A background agent that reviews inventory data every 6 hours, detects five specific categories of anomaly, and surfaces each one as an `Alert` with a plain-English explanation — replacing the earlier `smartStockoutCheck` cron, which only flagged one thing (stockout risk) via a single boolean field with no persisted reasoning and no audit trail.
+
+The agent runs as an Inngest scheduled function (`inventory-anomaly-agent`, `lib/inngest/functions/anomalyAgent.ts`), writes to a dedicated `Alert` collection (`database/models/Alert.ts`), and is surfaced in the UI at `/alerts`, plus a live "Stockout Risk" badge on the products page.
+
+## Anomaly Types Detected
+
+| Type                        | What it catches                                                                                               | Detection logic                                                                                                                            |
+| --------------------------- | ------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------ |
+| `STOCK_DROP`                | A single sudden, large stock decrease                                                                         | A ledger entry with both an absolute floor (≥5 units) **and** a relative threshold (≥30% of prior stock) drop, within a 24h lookback       |
+| `NEGATIVE_STOCK`            | A product sitting at a negative stock value                                                                   | `stock < 0` — a data-integrity signal (an oversell that slipped past whatever should have blocked it), not a business-metric judgment call |
+| `SYNC_DRIFT`                | A connected, sync-enabled store whose platform has more recent inventory activity than its last recorded sync | Ledger activity for that store's mapped products newer than `lastSyncAt` by more than 12h                                                  |
+| `STORE_STATE_CONTRADICTION` | A store configured to sync (`isSyncEnabled: true`) while not actually connected (`isConnected: false`)        | Direct state check — no threshold, the condition itself is the anomaly                                                                     |
+| `STOCKOUT_RISK`             | A product projected to run out soon based on real sales velocity                                              | 14-day rolling velocity (genuine `ORDER_FULFILLMENT` sales only, minimum 3 distinct orders — see below) projecting stockout within 7 days  |
+
+Each type carries a severity (`LOW` / `MEDIUM` / `HIGH`) computed deterministically from the same numbers that triggered detection — never assigned by the LLM.
+
+## What Was Deliberately Excluded, and Why
+
+The original feature scope also called for detecting **pricing inconsistencies across platforms** and **sync failures between all three platforms** (Shopify/Amazon/WooCommerce). Both were cut after checking what the schema can actually prove, not after checking what sounded good in the spec:
+
+- **Pricing inconsistencies**: `Product.price` is a single unified field. No per-platform price is stored anywhere in `mappings.shopify` / `mappings.amazon` / `mappings.woocommerce`, and there's no price history. Detecting "the Shopify price and Amazon price disagree" requires data this system doesn't capture. Fabricating this feature without the underlying field would mean pointing at nothing if a client asked to see it work.
+- **Full cross-platform sync failures**: only `mappings.amazon` persists a `syncStatus`/`lastSyncError`. Shopify and WooCommerce are "immediate response" integrations (see `Store.ts` constraints) — their failures exist only as transient Inngest step-retry events, never written anywhere queryable on the Product or Store document. `SYNC_DRIFT` (above) is the honest version of this: it catches staleness, which the data supports, rather than claiming to catch "failure," which it doesn't.
+
+Both are documented gaps, not silent ones — the fix for either (adding per-platform price fields; adding persisted sync-failure state to Shopify/WooCommerce mappings) is a schema change, deliberately out of scope for this feature rather than something shipped half-working.
+
+## Architecture: Code Detects, LLM Explains
+
+Every anomaly is found by deterministic code (`lib/anomalies/detectors.ts`) — threshold checks, aggregations, direct state comparisons. The LLM (`lib/anomalies/generateReasoning.ts`) is never asked whether something is an anomaly; it's given a closed list of already-confirmed `{dedupeKey, type, dataPoints}` records and asked only to write one or two grounded sentences per item. This mirrors the same correction made to Feature 1's RAG pipeline (Week 6): don't let the model own a judgment that should be deterministic and auditable.
+
+Two layers enforce this split doesn't quietly erode:
+
+1. **Batching risk**: sending multiple anomalies in one call for cost efficiency means the model could misattribute one item's numbers to another's `dedupeKey`. Every generated reasoning is checked post-hoc — does it actually mention the anomaly's own identifying value (SKU, product name, or store name)? If not, or if the model dropped/invented a `dedupeKey`, that item falls back to a **deterministic, template-built sentence assembled directly from `dataPoints`** — guaranteeing every alert gets _some_ correct reasoning, never a hallucinated or silently misattributed one.
+2. **Visible data doesn't depend on the model having summarized correctly**: the `/alerts` UI renders `dataPoints` as its own grid, separately from the `reasoning` text — the same "second grounding layer" pattern as Feature 1's results card. The numbers a user sees are never solely the LLM's word for it.
+
+Model calls use the Vercel AI SDK's `generateText` with structured `output: Output.object({ schema })` (the currently-correct API — `generateObject` is deprecated as of the installed SDK version), reusing Feature 1's `resilientQueryModel` (model-agnostic fallback middleware) and the app's existing Langfuse/OTel telemetry wiring verbatim.
+
+## Deduplication, Resolution, and Reopening
+
+Each candidate anomaly gets a `dedupeKey` so a job running every 6 hours doesn't spam a new alert for one ongoing problem:
+
+- **Discrete-event type** (`STOCK_DROP` only): keyed to the specific triggering ledger entry. A product having a second, later drop gets its own separate alert — the first is never touched by it.
+- **Ongoing-condition types** (`NEGATIVE_STOCK`, `SYNC_DRIFT`, `STORE_STATE_CONTRADICTION`, `STOCKOUT_RISK`): keyed stably per product/store, since the condition is a persistent state, not a moment.
+
+**Auto-resolve applies only to the four ongoing-condition types.** If a run no longer detects that `dedupeKey`, the alert is marked `RESOLVED`. `STOCK_DROP` is deliberately excluded from this: its detector only looks back 24 hours, so every stock-drop alert would naturally age out of that window within ~4 cron cycles regardless of whether anyone saw it — auto-resolving on "no longer detected" would silently close it for the wrong reason. `STOCK_DROP` alerts stay `OPEN` until a human dismisses them.
+
+**Manual dismiss** is supported from the UI (`/alerts`) for any `OPEN` alert. Dismissing doesn't fix anything — it's an acknowledgment, not a remediation.
+
+**Dismiss-and-recur is handled explicitly, not left to default behavior:** if a dismissed alert's underlying condition is still present on a later run, the reconcile step reopens the _same_ document (clearing `dismissedAt`, refreshing `dataPoints`/severity, regenerating reasoning) rather than creating a second document with the same `dedupeKey`. Without this, dismissing an unresolved ongoing condition would silently fragment its history across multiple documents every 6 hours.
+
+Alerts whose `dataPoints`/severity are unchanged from the previous run are intended to skip both the database write and the reasoning regeneration, to avoid burning an LLM call re-explaining numbers that haven't moved — this comparison is currently a `JSON.stringify` equality check between the freshly computed candidate and the existing document's stored value.
+
+## Cost Per Run
+
+Cost scales with the number of _batches_, not the number of anomalies directly — up to 20 anomalies needing reasoning are grouped into a single `generateText` call (`REASONING_BATCH_SIZE`), so a typical run (single-digit alert count) makes exactly one small structured-output call. Exact per-run cost is tracked in Langfuse (`functionId: anomaly-reasoning-agent`) rather than estimated here — same approach as Feature 1's `costNote`, pointing to the observability tool that already measures this accurately instead of maintaining a second, easily-stale cost calculation in code or docs.
+
+## Known Limitations
+
+- **All thresholds are reasoned defaults calibrated against synthetic seed data, not real production traffic** — the 30%/5-unit stock-drop floor, the 12h/24h/48h sync-drift tiers, the 7-day/3-day/1-day stockout-risk tiers, and the 3-order minimum sample size for trusting a velocity figure. Same caveat class as the RAG pipeline's `CONFIDENCE_THRESHOLD`: stated explicitly rather than silently assumed correct, and worth revisiting once real usage data exists.
+- **The reasoning grounding check verifies topical relevance, not full numeric correctness** — it confirms the model's text mentions the right SKU/store, not that every number in the sentence is accurate. The deterministic fallback template is the actual correctness guarantee when it fires; the grounding check is a floor, not a complete verifier.
+- **Known N+1 query patterns** in `detectSyncDrift` (2 queries per active store) and the reconcile step's per-candidate DB round-trips — acceptable at current alert volumes, would need to become real bulk operations at higher scale.
+- **`Product.recentSalesVelocity` / `stockoutRisk` / `lastRiskAnalysis` fields were removed entirely** (not deprecated in place) once nothing read or wrote them anymore — a frozen, silently-stale field in a live UI was judged worse than removing it and rebuilding the one feature that depended on it (the products-page badge) against live `Alert` data instead.
+
+## Replaces `smartStockoutCheck`
+
+The prior daily cron (`lib/inngest/functions/smartStockout.ts`) is fully removed. It used the raw `@google/generative-ai` SDK directly (not the Vercel AI SDK), had no Langfuse tracing, no model fallback, and let Gemini decide risk from a bare `responseSchema` with no downstream validation of correctness — the same class of pattern this feature's code-detects/LLM-explains split was built to avoid repeating. Its one useful piece of logic (14-day sales velocity aggregation) was carried forward into `detectStockoutRisk`, corrected to count only genuine `ORDER_FULFILLMENT` sales events with a minimum sample size, rather than any negative ledger change.
