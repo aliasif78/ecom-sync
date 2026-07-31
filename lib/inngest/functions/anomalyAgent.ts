@@ -45,6 +45,14 @@
 // the same end state, not duplicates. This is a load-bearing property, not
 // an accident.
 //
+// ⚠️ DISMISS-REOPEN, NOT DUPLICATE: if a candidate's dedupeKey matches a
+// DISMISSED alert (not an OPEN one), the reconcile step reopens that SAME
+// document rather than creating a second one. Without this, dismissing an
+// alert whose underlying condition persists would silently produce a new
+// document every 6 hours with the same dedupeKey — technically allowed by
+// the partial unique index (which only constrains OPEN), but not what
+// "dismiss" should mean. Decided explicitly after Phase 6, not by default.
+//
 // ⚠️ JSON.stringify-BASED CHANGE DETECTION IS A HEURISTIC, NOT A RIGOROUS
 // DEEP-EQUAL: comparing existing.dataPoints to a freshly computed candidate's
 // dataPoints via JSON.stringify only works reliably because both are always
@@ -74,6 +82,7 @@ import PostHogClient from '@/lib/posthog';
 const ONGOING_CONDITION_TYPES: AlertType[] = [ALERT_TYPE.NEGATIVE_STOCK, ALERT_TYPE.SYNC_DRIFT, ALERT_TYPE.STORE_STATE_CONTRADICTION, ALERT_TYPE.STOCKOUT_RISK];
 
 const POSTHOG_EVENT_ALERT_CREATED = 'ANOMALY_ALERT_CREATED';
+const POSTHOG_EVENT_ALERT_REOPENED = 'ANOMALY_ALERT_REOPENED';
 
 // ==========================================
 // 🚓 TYPES
@@ -115,6 +124,7 @@ interface NewAlertEvent {
 interface ReconcileResult {
   needsReasoning: (ReasoningInput & { alertId: string })[];
   newAlerts: NewAlertEvent[];
+  reopenedAlerts: NewAlertEvent[];
 }
 
 // ==========================================
@@ -216,6 +226,7 @@ export const anomalyAgent = inngest.createFunction(
 
       const needsReasoning: (ReasoningInput & { alertId: string })[] = [];
       const newAlerts: NewAlertEvent[] = [];
+      const reopenedAlerts: NewAlertEvent[] = [];
 
       for (const type of Object.values(ALERT_TYPE) as AlertType[]) {
         const candidates = candidatesByType[type];
@@ -225,6 +236,26 @@ export const anomalyAgent = inngest.createFunction(
           const existing = await Alert.findOpenByDedupeKey(candidate.userId, candidate.dedupeKey);
 
           if (!existing) {
+            // Not currently OPEN — but check whether this is a RECURRENCE of
+            // something the user already dismissed, before creating a new
+            // document. Reopening the same document (rather than creating a
+            // second one with the same dedupeKey) keeps one continuous
+            // history per real-world anomaly instance instead of
+            // fragmenting it across multiple documents.
+            const dismissed = await Alert.findDismissedByDedupeKey(candidate.userId, candidate.dedupeKey);
+
+            if (dismissed) {
+              dismissed.status = ALERT_STATUS.OPEN;
+              dismissed.dismissedAt = null;
+              dismissed.dataPoints = candidate.dataPoints;
+              dismissed.severity = candidate.severity;
+              await dismissed.save();
+
+              needsReasoning.push({ alertId: dismissed._id.toString(), dedupeKey: candidate.dedupeKey, type: candidate.type, dataPoints: candidate.dataPoints });
+              reopenedAlerts.push({ alertId: dismissed._id.toString(), type: candidate.type, severity: candidate.severity, productId: candidate.productId, storeId: candidate.storeId, dedupeKey: candidate.dedupeKey });
+              continue;
+            }
+
             const created = await Alert.create({
               userId: candidate.userId,
               type: candidate.type,
@@ -264,7 +295,7 @@ export const anomalyAgent = inngest.createFunction(
         }
       }
 
-      return { needsReasoning, newAlerts };
+      return { needsReasoning, newAlerts, reopenedAlerts };
     });
 
     // ------------------------------------------------------------------
@@ -305,7 +336,10 @@ export const anomalyAgent = inngest.createFunction(
     // ------------------------------------------------------------------
     // STEP GROUP 4 — Telemetry. One PostHog event per NEW alert (mirrors
     // smartStockout.ts's per-item `highRIskIds.forEach(ph.capture)`
-    // pattern), then flush both PostHog and Langfuse before the step exits.
+    // pattern) and one per REOPENED alert (distinct event — reopening a
+    // dismissed alert is a meaningfully different thing than creating a
+    // fresh one, worth telling apart in analytics later), then flush both
+    // PostHog and Langfuse before the step exits.
     // ------------------------------------------------------------------
 
     await step.run('telemetry', async () => {
@@ -319,12 +353,21 @@ export const anomalyAgent = inngest.createFunction(
         });
       }
 
+      for (const alert of reconcileResult.reopenedAlerts) {
+        ph.capture({
+          distinctId: 'system_background_job',
+          event: POSTHOG_EVENT_ALERT_REOPENED,
+          properties: { alertId: alert.alertId, type: alert.type, severity: alert.severity, productId: alert.productId, storeId: alert.storeId, dedupeKey: alert.dedupeKey },
+        });
+      }
+
       await ph.shutdown();
       await flushTelemetry();
     });
 
     return {
       newAlerts: reconcileResult.newAlerts.length,
+      reopenedAlerts: reconcileResult.reopenedAlerts.length,
       reasoningGenerated: reconcileResult.needsReasoning.length,
     };
   }

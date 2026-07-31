@@ -29,11 +29,15 @@
 //
 // The uniqueness constraint below is a PARTIAL index scoped to `status: OPEN`.
 // This is deliberate: a DISMISSED or RESOLVED alert must never block a new
-// OPEN alert with the same dedupeKey from being created later. Whether the
-// Phase 4 reconcile step actually chooses to recreate one (vs. respecting an
-// existing DISMISSED alert whose dataPoints haven't materially changed) is
-// reconcile-logic, not a schema constraint — the schema just needs to allow
-// either behavior.
+// OPEN alert with the same dedupeKey from being created later.
+//
+// ⚠️ DISMISS-REOPEN BEHAVIOR (decided after Phase 6): if a DISMISSED alert's
+// underlying condition is STILL detected on a later run, the reconcile step
+// reopens THAT SAME document (status → OPEN, dismissedAt cleared,
+// dataPoints/severity refreshed) rather than creating a second document with
+// the same dedupeKey. This preserves one continuous history per real-world
+// anomaly instance instead of fragmenting it across documents. See
+// Alert.findDismissedByDedupeKey and anomalyAgent.ts's reconcile step.
 //
 // ⚠️ VERIFIED ASSUMPTION: `dataPoints` is intentionally `Mixed` because its
 // shape differs per `type` (e.g. {oldStock, newStock, pctChange} for a drop
@@ -120,6 +124,7 @@ export interface IAlert extends Document {
 
 interface IAlertModel extends Model<IAlert> {
   findOpenByDedupeKey(userId: string | Types.ObjectId, dedupeKey: string): Promise<IAlert | null>;
+  findDismissedByDedupeKey(userId: string | Types.ObjectId, dedupeKey: string): Promise<IAlert | null>;
 }
 
 // ==========================================
@@ -204,6 +209,13 @@ AlertSchema.methods.resolve = async function () {
 
 AlertSchema.statics.findOpenByDedupeKey = function (userId: string | Types.ObjectId, dedupeKey: string) {
   return this.findOne({ userId, dedupeKey, status: ALERT_STATUS.OPEN });
+};
+
+/** Used by the reconcile step to check "is this a recurrence of something
+ * the user already dismissed?" before creating a new document. See the
+ * DISMISS-REOPEN BEHAVIOR note at the top of this file. */
+AlertSchema.statics.findDismissedByDedupeKey = function (userId: string | Types.ObjectId, dedupeKey: string) {
+  return this.findOne({ userId, dedupeKey, status: ALERT_STATUS.DISMISSED });
 };
 
 // ==========================================
