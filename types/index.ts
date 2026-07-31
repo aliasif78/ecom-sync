@@ -177,10 +177,9 @@ export interface ProductRow {
   inventoryByLocation: { _id?: string; locationId: string; quantity: number }[];
   version: number; // Optimistic concurrency token
 
-  // Analytics & AI
+  // Analytics
   recentSalesVelocity: number; // Rolling 14-day average units sold per day
-  stockoutRisk: boolean;
-  lastRiskAnalysis: string | null; // ISO string or null
+  // stockoutRisk / lastRiskAnalysis REMOVED (Feature 2 cleanup) — see database/models/Product.ts
 
   // Status
   isArchived: boolean;

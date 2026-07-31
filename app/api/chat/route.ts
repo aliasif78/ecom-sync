@@ -28,7 +28,7 @@ export async function POST(req: Request) {
   const userId = authResult.user._id.toString();
 
   const result = streamText({
-    model: google('gemini-2.5-flash-lite'),
+    model: google('gemini-3.1-flash-lite'),
 
     // 🧠 UPGRADE 1: The Master Prompt. We literally tell it how to map human intent to tools.
     system: `You are the EcomSync Copilot, an elite AI assistant for e-commerce merchants. 

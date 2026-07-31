@@ -1,0 +1,52 @@
+#!/bin/bash
+# ==========================================
+# Phase 3 checkpoint — curl tests against /api/chat/query
+# ==========================================
+#
+# Run these against your local dev server (npm run dev, separate terminal).
+#
+# ⚠️ AUTH: getCurrentUser() reads the session from cookies. A raw curl
+# request has no browser session, so this WILL 401 unless you pass a valid
+# session cookie. Easiest way to get one:
+#   1. Log in via the browser as normal.
+#   2. Open DevTools → Application → Cookies → copy the Supabase auth
+#      cookie value(s) for localhost:3000.
+#   3. Paste them into the COOKIE variable below.
+#
+# If your session uses multiple cookies (Supabase often sets more than one),
+# include all of them semicolon-separated, exactly as they appear in DevTools.
+
+COOKIE="sb-uekxumppcvtpjkbpxjjl-auth-token.0=base64-eyJhY2Nlc3NfdG9rZW4iOiJleUpoYkdjaU9pSkZVekkxTmlJc0ltdHBaQ0k2SWpabU5HTTBOV1U0TFROa1ptVXRORE5sWlMwNU9HRXpMV0ZpWlRWa1ltWXhaR1ExWWlJc0luUjVjQ0k2SWtwWFZDSjkuZXlKcGMzTWlPaUpvZEhSd2N6b3ZMM1ZsYTNoMWJYQndZM1owY0dwclluQjRhbXBzTG5OMWNHRmlZWE5sTG1OdkwyRjFkR2d2ZGpFaUxDSnpkV0lpT2lKak5qZzFOemhtTWkxbVlqazFMVFJrWVRFdE9EZGpNUzFsWXpOaVlXRmxOakl5WXpFaUxDSmhkV1FpT2lKaGRYUm9aVzUwYVdOaGRHVmtJaXdpWlhod0lqb3hOemcxTkRFM01UVTFMQ0pwWVhRaU9qRTNPRFUwTVRNMU5UVXNJbVZ0WVdsc0lqb2lZV3hwWVhOcFpqRXhOekZBWjIxaGFXd3VZMjl0SWl3aWNHaHZibVVpT2lJaUxDSmhjSEJmYldWMFlXUmhkR0VpT25zaWNISnZkbWxrWlhJaU9pSmxiV0ZwYkNJc0luQnliM1pwWkdWeWN5STZXeUpsYldGcGJDSXNJbWR2YjJkc1pTSmRmU3dpZFhObGNsOXRaWFJoWkdGMFlTSTZleUpoZG1GMFlYSmZkWEpzSWpvaWFIUjBjSE02THk5c2FETXVaMjl2WjJ4bGRYTmxjbU52Ym5SbGJuUXVZMjl0TDJFdlFVTm5PRzlqU25FNFNrNVZaek5yVVROTFVUUmxkbWN6VmpKNWNreGhZVlk1UlRCc1Z6QkdiV2x2ZDFjd09FUmZRek16ZVd0NmF6MXpPVFl0WXlJc0ltVnRZV2xzSWpvaVlXeHBZWE5wWmpFeE56RkFaMjFoYVd3dVkyOXRJaXdpWlcxaGFXeGZkbVZ5YVdacFpXUWlPblJ5ZFdVc0ltWjFiR3hmYm1GdFpTSTZJa0ZzYVNCQmMybG1JaXdpYVhOeklqb2lhSFIwY0hNNkx5OWhZMk52ZFc1MGN5NW5iMjluYkdVdVkyOXRJaXdpYm1GdFpTSTZJa0ZzYVNCQmMybG1JaXdpY0dodmJtVmZkbVZ5YVdacFpXUWlPbVpoYkhObExDSndhV04wZFhKbElqb2lhSFIwY0hNNkx5OXNhRE11WjI5dloyeGxkWE5sY21OdmJuUmxiblF1WTI5dEwyRXZRVU5uT0c5alNuRTRTazVWWnpOclVUTkxVVFJsZG1jelZqSjVja3hoWVZZNVJUQnNWekJHYldsdmQxY3dPRVJmUXpNemVXdDZhejF6T1RZdFl5SXNJbkJ5YjNacFpHVnlYMmxrSWpvaU1UQTRPVEUxTXpJNU1EQXhOamsxT1RZMU9UTXpJaXdpYzNWaUlqb2lNVEE0T1RFMU16STVNREF4TmprMU9UWTFPVE16SW4wc0luSnZiR1VpT2lKaGRYUm9aVzUwYVdOaGRHVmtJaXdpWVdGc0lqb2lZV0ZzTVNJc0ltRnRjaUk2VzNzaWJXVjBhRzlrSWpvaWIyRjFkR2dpTENKMGFXMWxjM1JoYlhBaU9qRTNPRFUwTURrNU9EZDlYU3dpYzJWemMybHZibDlwWkNJNkltSXlORFEwWWpBM0xUZGpORFF0TkdWak5DMDVOemt5TFRsbFl6VTFPRFUyWTJKaE9TSXNJbWx6WDJGdWIyNTViVzkxY3lJNlptRnNjMlY5LnkyOEVGbUt1R3dJdlg1c0ZlcnROZ1RkNHFLNzRXQWxINTFUaEZoOTJTbnh1Uk5JTlZZa29kNzFDMzVTMGRrd3huOE1MWXFWbjhKbzA0NGVYRnZ3YXpBIiwidG9rZW5fdHlwZSI6ImJlYXJlciIsImV4cGlyZXNfaW4iOjM2MDAsImV4cGlyZXNfYXQiOjE3ODU0MTcxNTUsInJlZnJlc2hfdG9rZW4iOiI0dWlhYmQyaWV1dGsiLCJ1c2VyIjp7ImlkIjoiYzY4NTc4ZjItZmI5NS00ZGExLTg3YzEtZWMzYmFhZTYyMmMxIiwiYXVkIjoiYXV0aGVudGljYXRlZCIsInJvbGUiOiJhdXRoZW50aWNhdGVkIiwiZW1haWwiOiJhbGlhc2lmMTE3MUBnbWFpbC5jb20iLCJlbWFpbF9jb25maXJtZWRfYXQiOiIyMDI2LTA0LTA0VDE1OjM4OjEzLjA5NDEzNloiLCJwaG9uZSI6IiIsImNvbmZpcm1hdGlvbl9zZW50X2F0IjoiMjAyNi0wNC0wNFQxNTozODowMC4xODE1NDJaIiwiY29uZmlybWVkX2F0IjoiMjAyNi0wNC0wNFQxNTozODoxMy4wOTQxMzZaIiwibGFzdF9zaWduX2luX2F0IjoiMjAyNi0wNy0zMFQxMToxMzowNy45Mzc1MloiLCJhcHBfbWV0YWRhdGEiOnsicHJvdmlkZXIiOiJlbWFpbCIsInByb3ZpZGVycyI6WyJlbWFpbCIsImdvb2dsZSJdfSwidXNlcl9tZXRhZGF0YSI6eyJhdmF0YXJfdXJsIjoiaHR0cHM6Ly9saDMuZ29vZ2xldXNlcmNvbnRlbnQuY29tL2EvQUNnOG9jSnE4Sk5VZzNrUTNLUTRldmczVjJ5ckxhYVY5RTBsVzBGbWlvd1cwOERfQzMzeWt6az1zOTYtYyIsImVtYWlsIjoiYWxpYXNpZjExNzFAZ21haWwuY29tIiwiZW1haWxfdmVyaWZpZWQiOnRydWUsImZ1bGxfbmFtZSI6IkFsaSBBc2lmIiwiaXNzIjoiaHR0cHM6Ly9hY2NvdW50cy5nb29nbGUuY29tIiwibmFtZSI6IkFsaSBBc2lmIiwicGhvbmVfdmVyaWZpZWQiOmZhbHNlLCJwaWN0dXJlIjoiaHR0cHM6Ly9saDMuZ29vZ2xldXNlcmNvbnRlbnQuY29tL2EvQUNnOG9jSnE4Sk5VZzNrUTNLUTRldmczVjJ5ckxhYVY5RTBsVzBGbWlvd1cwOERfQzMzeWt6az1zOTYtYyIsInByb3ZpZGVyX2lkIjoiMTA4OTE1MzI5MDAxNjk1OTY1OTMzIiwic3ViIjoiMTA4OTE1MzI5MDAxNjk1OTY1OTMzIn0sImlkZW50aXRpZXMiOlt7ImlkZW50aXR5X2lkI; sb-uekxumppcvtpjkbpxjjl-auth-token.1=joiMTUxMzI0ZGEtZGNiNC00Zjc0LWJmOTYtNWNjODgyMTQ4NzM5IiwiaWQiOiJjNjg1NzhmMi1mYjk1LTRkYTEtODdjMS1lYzNiYWFlNjIyYzEiLCJ1c2VyX2lkIjoiYzY4NTc4ZjItZmI5NS00ZGExLTg3YzEtZWMzYmFhZTYyMmMxIiwiaWRlbnRpdHlfZGF0YSI6eyJlbWFpbCI6ImFsaWFzaWYxMTcxQGdtYWlsLmNvbSIsImVtYWlsX3ZlcmlmaWVkIjp0cnVlLCJmdWxsX25hbWUiOiJBbGkgQXNpZiIsInBob25lX3ZlcmlmaWVkIjpmYWxzZSwic3ViIjoiYzY4NTc4ZjItZmI5NS00ZGExLTg3YzEtZWMzYmFhZTYyMmMxIn0sInByb3ZpZGVyIjoiZW1haWwiLCJsYXN0X3NpZ25faW5fYXQiOiIyMDI2LTA0LTA0VDE1OjM4OjAwLjE2Mjk4MloiLCJjcmVhdGVkX2F0IjoiMjAyNi0wNC0wNFQxNTozODowMC4xNjMwNTJaIiwidXBkYXRlZF9hdCI6IjIwMjYtMDQtMDRUMTU6Mzg6MDAuMTYzMDUyWiIsImVtYWlsIjoiYWxpYXNpZjExNzFAZ21haWwuY29tIn0seyJpZGVudGl0eV9pZCI6IjdlODhkNWU0LTYyMWItNGNmNi05ODM1LWM0MDFiMzgyZWEwOSIsImlkIjoiMTA4OTE1MzI5MDAxNjk1OTY1OTMzIiwidXNlcl9pZCI6ImM2ODU3OGYyLWZiOTUtNGRhMS04N2MxLWVjM2JhYWU2MjJjMSIsImlkZW50aXR5X2RhdGEiOnsiYXZhdGFyX3VybCI6Imh0dHBzOi8vbGgzLmdvb2dsZXVzZXJjb250ZW50LmNvbS9hL0FDZzhvY0pxOEpOVWcza1EzS1E0ZXZnM1YyeXJMYWFWOUUwbFcwRm1pb3dXMDhEX0MzM3lrems9czk2LWMiLCJlbWFpbCI6ImFsaWFzaWYxMTcxQGdtYWlsLmNvbSIsImVtYWlsX3ZlcmlmaWVkIjp0cnVlLCJmdWxsX25hbWUiOiJBbGkgQXNpZiIsImlzcyI6Imh0dHBzOi8vYWNjb3VudHMuZ29vZ2xlLmNvbSIsIm5hbWUiOiJBbGkgQXNpZiIsInBob25lX3ZlcmlmaWVkIjpmYWxzZSwicGljdHVyZSI6Imh0dHBzOi8vbGgzLmdvb2dsZXVzZXJjb250ZW50LmNvbS9hL0FDZzhvY0pxOEpOVWcza1EzS1E0ZXZnM1YyeXJMYWFWOUUwbFcwRm1pb3dXMDhEX0MzM3lrems9czk2LWMiLCJwcm92aWRlcl9pZCI6IjEwODkxNTMyOTAwMTY5NTk2NTkzMyIsInN1YiI6IjEwODkxNTMyOTAwMTY5NTk2NTkzMyJ9LCJwcm92aWRlciI6Imdvb2dsZSIsImxhc3Rfc2lnbl9pbl9hdCI6IjIwMjYtMDYtMDZUMTI6Mzk6MjguNDYyNDI5WiIsImNyZWF0ZWRfYXQiOiIyMDI2LTA2LTA2VDEyOjM5OjI4LjQ2MjQ3NVoiLCJ1cGRhdGVkX2F0IjoiMjAyNi0wNy0zMFQxMToxMzowNi42NDQ4MjNaIiwiZW1haWwiOiJhbGlhc2lmMTE3MUBnbWFpbC5jb20ifV0sImNyZWF0ZWRfYXQiOiIyMDI2LTA0LTA0VDE1OjM4OjAwLjEzMTgwOVoiLCJ1cGRhdGVkX2F0IjoiMjAyNi0wNy0zMFQxMjoxMjozNS4zNDg4NDRaIiwiaXNfYW5vbnltb3VzIjpmYWxzZX19"
+URL="http://localhost:3000/api/chat/query"
+
+# Helper: sends one message and pretty-prints the raw stream output.
+send() {
+  local label="$1"
+  local text="$2"
+  echo ""
+  echo "=== $label ==="
+  echo "--- Query: \"$text\" ---"
+  curl -s -N "$URL" \
+    -H "Content-Type: application/json" \
+    -H "Cookie: $COOKIE" \
+    -d "{\"messages\":[{\"id\":\"test-1\",\"role\":\"user\",\"parts\":[{\"type\":\"text\",\"text\":\"$text\"}]}]}"
+  echo ""
+}
+
+# 1. The exact example query from the plan
+send "Example query from plan" "Which SKUs have been out of stock on Amazon for more than 3 days?"
+
+# 2. lowStock
+send "Low stock query" "Which products are running low on stock?"
+
+# 3. stockAbove / stockBelow
+send "Stock threshold query" "Show me products with more than 20 units in stock"
+
+# 4. Ambiguous — should NOT force a mapping onto one of the 4 conditions
+send "Ambiguous query" "Which products are trending down in sales?"
+
+# 5. Zero-result case — adjust the SKU/condition below to something you know won't match
+send "Zero matches" "Which SKUs are out of stock on WooCommerce for more than 60 days?"
+
+# 6. Off-topic / mutation attempt — confirm the route stays read-only and doesn't degrade into general chit-chat
+send "Mutation attempt (should refuse, read-only)" "Set the stock of TEST-A to 50"

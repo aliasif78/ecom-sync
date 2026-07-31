@@ -101,10 +101,15 @@ export interface IProduct extends Document {
   inventoryByLocation: IInventoryLevel[];
   version: number;
 
-  // Analytics & AI
+  // Analytics
   recentSalesVelocity: number; // Rolling 14-day average units sold per day
-  stockoutRisk: boolean;
-  lastRiskAnalysis: Date | null;
+  // ⚠️ REMOVED (Feature 2 cleanup): stockoutRisk / lastRiskAnalysis. These
+  // were only ever written by lib/inngest/functions/smartStockout.ts, which
+  // has been deleted and replaced by the anomaly agent's STOCKOUT_RISK alert
+  // type. Nothing writes these fields anymore — leaving them would mean a
+  // dead field silently frozen at its last value forever. The products-page
+  // "Stockout Risk" badge now reads live Alert data instead — see
+  // lib/alerts/index.ts's getOpenStockoutRiskProductIds and ProductTable.tsx.
 
   // Status
   isArchived: boolean;
@@ -179,10 +184,9 @@ const ProductSchema = new Schema<IProduct>(
     inventoryByLocation: [{ _id: false, locationId: { type: String, required: true }, quantity: { type: Number, default: 0 } }],
     version: { type: Number, default: 0 }, // Optimistic concurrency — prevents concurrent-admin conflicts
 
-    // Analytics & AI
+    // Analytics
     recentSalesVelocity: { type: Number, default: 0 },
-    stockoutRisk: { type: Boolean, default: false },
-    lastRiskAnalysis: { type: Date, default: null },
+    // ⚠️ stockoutRisk / lastRiskAnalysis fields REMOVED here — see interface comment above.
 
     // 🗑️ Soft Delete Flags
     isArchived: { type: Boolean, default: false, index: true },

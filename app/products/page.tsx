@@ -5,6 +5,7 @@ export const dynamic = 'force-dynamic';
 // API
 import { getProducts } from '@/lib/products';
 import { getCurrentUser } from '@/lib/users';
+import { getOpenStockoutRiskProductIds } from '@/lib/alerts/index';
 
 // Components
 import ProductHeader from '@/components/products/ProductHeader';
@@ -22,6 +23,12 @@ const Page = async () => {
     console.error(`🚩 Page Load Error: ${message}`);
     return <ErrorMessage message={message} />;
   }
+
+  // Stockout-risk product IDs, from Feature 2's Alert collection — replaces
+  // the old product.stockoutRisk field as the "Stockout Risk" badge's data
+  // source (see ProductTable.tsx). Empty array if there's no user yet,
+  // matching the same defensive pattern as `isSyncing` below.
+  const stockoutRiskProductIds = user?._id ? await getOpenStockoutRiskProductIds(user._id.toString()) : [];
 
   // Constants
   const isSyncing = user?.isSyncing || [];
@@ -44,7 +51,7 @@ const Page = async () => {
         <ProductHeader totalStock={totalStock} lowStockCount={lowStockCount} />
 
         {/* The Main Data Table */}
-        <ProductTable products={products} isSyncing={isSyncing} />
+        <ProductTable products={products} isSyncing={isSyncing} stockoutRiskProductIds={stockoutRiskProductIds} />
       </div>
     </div>
   );

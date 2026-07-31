@@ -38,7 +38,7 @@ export default function Navbar({ user, initialChaos }: NavbarProps) {
           {/* 2. Middle Navigation */}
           {user && (
             <div className="hidden items-center gap-1 md:flex">
-              {['products', 'stores'].map((path) => (
+              {['products', 'stores', 'alerts'].map((path) => (
                 <NavLink key={path} href={'/' + path} active={pathname === '/' + path}>
                   {path.charAt(0).toUpperCase() + path.slice(1)}
                 </NavLink>
