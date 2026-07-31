@@ -16,22 +16,24 @@ import Copilot from '@/components/shared/Copilot';
 
 const Page = async () => {
   // API
-  const { user } = await getCurrentUser();
-  const { products, success, message } = await getProducts(user?._id.toString());
+  const { success: authSuccess, user } = await getCurrentUser();
+
+  if (!authSuccess || !user) {
+    return <ErrorMessage message="You must be logged in to view products." />;
+  }
+
+  const userId = user._id.toString();
+  const { products, success, message } = await getProducts(userId);
 
   if (!success) {
     console.error(`🚩 Page Load Error: ${message}`);
     return <ErrorMessage message={message} />;
   }
 
-  // Stockout-risk product IDs, from Feature 2's Alert collection — replaces
-  // the old product.stockoutRisk field as the "Stockout Risk" badge's data
-  // source (see ProductTable.tsx). Empty array if there's no user yet,
-  // matching the same defensive pattern as `isSyncing` below.
-  const stockoutRiskProductIds = user?._id ? await getOpenStockoutRiskProductIds(user._id.toString()) : [];
+  const stockoutRiskProductIds = await getOpenStockoutRiskProductIds(userId);
 
   // Constants
-  const isSyncing = user?.isSyncing || [];
+  const isSyncing = user.isSyncing || [];
 
   // Calculate some quick stats for the header
   const totalStock = products.reduce((acc, p) => acc + p.stock, 0);
